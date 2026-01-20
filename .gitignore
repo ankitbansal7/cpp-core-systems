@@ -1,0 +1,8 @@
+.vs/
+build/vs/**/.vs/
+build/vs/**/*.vcxproj*
+build/vs/**/*.suo
+build/vs/**/*.user
+build/vs/**/x64/
+build/vs/**/Debug/
+build/vs/**/Release/
