@@ -1,21 +1,14 @@
-#pragma once
-
-#ifndef scope_timer_hpp
-#define scope_timer_hpp
+#ifndef SCOPE_TIMER_HPP
+#define SCOPE_TIMER_HPP
 
 #include <chrono>
 #include <string>
+#include <iostream>
 
 class ScopeTimer
 {
 public:
     using Clock = std::chrono::steady_clock;
-
-    explicit ScopeTimer(const char* label)
-        : m_label(label),
-        m_start(Clock::now())
-    {
-    }
 
     explicit ScopeTimer(std::string label)
         : m_label(std::move(label)),
@@ -30,9 +23,15 @@ public:
 
     ~ScopeTimer() noexcept
     {
-        auto end = Clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - m_start);
-        std::cout << m_label << ": " << duration.count() << " ms\n";
+        try
+        {
+            const auto end = Clock::now();
+            const auto duration = std::chrono::duration<double, std::milli>(end - m_start);
+            std::cout << m_label << ": " << duration.count() << " ms\n";
+        }
+        catch (...)
+        {
+        }
     }
 
 private:
@@ -40,4 +39,14 @@ private:
     Clock::time_point m_start;
 };
 
-#endif // !scope_timer_hpp
+#if defined(__COUNTER__)
+#define SCOPE_TIMER_UNIQUE_ID __COUNTER__
+#else
+#define SCOPE_TIMER_UNIQUE_ID __LINE__
+#endif
+
+#define SCOPE_TIMER_CONCAT_INNER(a, b) a##b
+#define SCOPE_TIMER_CONCAT(a, b) SCOPE_TIMER_CONCAT_INNER(a, b)
+#define SCOPE_TIMER(label) ScopeTimer SCOPE_TIMER_CONCAT(_scopeTimer_, SCOPE_TIMER_UNIQUE_ID)(label)
+
+#endif // SCOPE_TIMER_HPP
