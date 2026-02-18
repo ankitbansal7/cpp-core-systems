@@ -1,8 +1,12 @@
+# CMake
+build*/
+out*/
+CMakeCache.txt
+CMakeUserPresets.json
+CMakeFiles/
+
+# Visual Studio
 .vs/
-build/vs/**/.vs/
-build/vs/**/*.vcxproj*
-build/vs/**/*.suo
-build/vs/**/*.user
-build/vs/**/x64/
-build/vs/**/Debug/
-build/vs/**/Release/
+*.vcxproj*
+*.user
+x64/
