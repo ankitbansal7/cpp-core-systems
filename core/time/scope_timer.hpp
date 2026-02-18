@@ -4,11 +4,55 @@
 #include <chrono>
 #include <string>
 #include <iostream>
+#include <utility>
 
+template <typename Ratio>
+struct ScopeTimerUnitSymbol
+{
+    static constexpr const char* value()
+    {
+        return " (custom)";
+    }
+};
+
+template <>
+struct ScopeTimerUnitSymbol<std::milli>
+{
+    static constexpr const char* value()
+    {
+        return " ms";
+    }
+};
+
+template <>
+struct ScopeTimerUnitSymbol<std::micro>
+{
+    static constexpr const char* value()
+    {
+        return " us";
+    }
+};
+
+template <>
+struct ScopeTimerUnitSymbol<std::nano>
+{
+    static constexpr const char* value()
+    {
+        return " ns";
+    }
+};
+
+template <typename Ratio>
 class ScopeTimer
 {
 public:
     using Clock = std::chrono::steady_clock;
+    using Duration = std::chrono::duration<double, Ratio>;
+
+    static_assert(
+        std::ratio<Ratio::num, Ratio::den>::den != 0,
+        "Ratio must be a std::ratio type"
+        );
 
     explicit ScopeTimer(std::string label)
         : m_label(std::move(label)),
@@ -26,8 +70,8 @@ public:
         try
         {
             const auto end = Clock::now();
-            const auto duration = std::chrono::duration<double, std::milli>(end - m_start);
-            std::cout << m_label << ": " << duration.count() << " ms\n";
+            const auto duration = std::chrono::duration_cast<Duration>(end - m_start);
+            std::cout << m_label << ": " << duration.count() << ScopeTimerUnitSymbol<Ratio>::value() << "\n";
         }
         catch (...)
         {
@@ -47,6 +91,16 @@ private:
 
 #define SCOPE_TIMER_CONCAT_INNER(a, b) a##b
 #define SCOPE_TIMER_CONCAT(a, b) SCOPE_TIMER_CONCAT_INNER(a, b)
-#define SCOPE_TIMER(label) ScopeTimer SCOPE_TIMER_CONCAT(_scopeTimer_, SCOPE_TIMER_UNIQUE_ID)(label)
+
+#define SCOPE_TIMER_MILLI(label) \
+  ScopeTimer<std::milli> SCOPE_TIMER_CONCAT(_scopeTimer_, SCOPE_TIMER_UNIQUE_ID)(label)
+
+#define SCOPE_TIMER_MICRO(label) \
+  ScopeTimer<std::micro> SCOPE_TIMER_CONCAT(_scopeTimer_, SCOPE_TIMER_UNIQUE_ID)(label)
+
+#define SCOPE_TIMER_NANO(label) \
+  ScopeTimer<std::nano> SCOPE_TIMER_CONCAT(_scopeTimer_, SCOPE_TIMER_UNIQUE_ID)(label)
+
+#define SCOPE_TIMER(label) SCOPE_TIMER_MILLI(label)
 
 #endif // SCOPE_TIMER_HPP

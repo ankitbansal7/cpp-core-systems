@@ -14,7 +14,12 @@ int main()
     }
 
     {
-        SCOPE_TIMER(string("String_test"));
+        SCOPE_TIMER("String_test");
+        std::this_thread::sleep_for(std::chrono::milliseconds(15));
+    }
+
+    {
+        SCOPE_TIMER("Default");
         std::this_thread::sleep_for(std::chrono::milliseconds(15));
     }
 
