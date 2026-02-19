@@ -5,57 +5,53 @@
 #include <string>
 #include <iostream>
 #include <utility>
+#include <type_traits>
+#include <cstdint>
 
 template <typename Ratio>
 struct ScopeTimerUnitSymbol
 {
-    static constexpr const char* value()
-    {
-        return " (custom)";
-    }
+    static constexpr const char* value() { return " (custom)"; }
 };
 
 template <>
 struct ScopeTimerUnitSymbol<std::milli>
 {
-    static constexpr const char* value()
-    {
-        return " ms";
-    }
+    static constexpr const char* value() { return " ms"; }
 };
 
 template <>
 struct ScopeTimerUnitSymbol<std::micro>
 {
-    static constexpr const char* value()
-    {
-        return " us";
-    }
+    static constexpr const char* value() { return " us"; }
 };
 
 template <>
 struct ScopeTimerUnitSymbol<std::nano>
 {
-    static constexpr const char* value()
-    {
-        return " ns";
-    }
+    static constexpr const char* value() { return " ns"; }
 };
+
+template<typename>
+struct is_ratio_type : std::false_type {};
+
+template<std::intmax_t N, std::intmax_t D>
+struct is_ratio_type<std::ratio<N, D>> : std::true_type {};
 
 template <typename Ratio>
 class ScopeTimer
 {
+    static_assert(
+        is_ratio_type<Ratio>::value,
+        "ScopeTimer<Ratio>: Ratio must be a std::ratio type"
+        );
+
 public:
     using Clock = std::chrono::steady_clock;
     using Duration = std::chrono::duration<double, Ratio>;
 
-    static_assert(
-        std::ratio<Ratio::num, Ratio::den>::den != 0,
-        "Ratio must be a std::ratio type"
-        );
-
-    explicit ScopeTimer(std::string label)
-        : m_label(std::move(label)),
+    explicit ScopeTimer(std::string label) :
+        m_label(std::move(label)),
         m_start(Clock::now())
     {
     }
