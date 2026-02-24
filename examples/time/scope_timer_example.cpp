@@ -80,14 +80,8 @@ int main()
     cout << slist4 << endl;
     slist4.pop_back();
     cout << slist4 << endl;
-    slist4.pop_back();
-    cout << slist4 << endl;
-    slist4.pop_back();
-    cout << slist4 << endl;
-    slist4.pop_back();
-    cout << slist4 << endl;
-    slist4.pop_back();
-    cout << slist4 << endl;
+    cout << slist4.contains(25) << endl;
+    cout << slist4.contains(35) << endl;
 
     return 0;
 }

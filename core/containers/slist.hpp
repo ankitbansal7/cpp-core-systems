@@ -75,6 +75,7 @@ public:
     void pop_front() noexcept;
     void clear() noexcept;
     void swap(SList& other) noexcept;
+    bool contains(const T& value) const;
 
     inline std::size_t size() const noexcept { return m_size; }
     inline bool empty() const noexcept { return (m_size == 0); }
@@ -266,6 +267,24 @@ void SList<T>::swap(SList& other) noexcept
     swap(m_head, other.m_head);
     swap(m_tail, other.m_tail);
     swap(m_size, other.m_size);
+}
+
+template<typename T>
+bool SList<T>::contains(const T& value) const
+{
+    const Node* node = m_head;
+
+    while (node)
+    {
+        if (node->m_value == value)
+        {
+            return true;
+        }
+
+        node = node->m_next;
+    }
+
+    return false;
 }
 
 #endif // SLIST_HPP
