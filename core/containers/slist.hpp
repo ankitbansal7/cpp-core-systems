@@ -35,8 +35,10 @@ public:
     explicit SList(T val);
     SList(std::initializer_list<T> values);
     SList(const SList& other);
+    SList(SList&& other) noexcept;
 
     SList& operator=(const SList& other);
+    SList& operator=(SList&& other) noexcept;
 
     friend std::ostream& operator<<(std::ostream& stream, const SList& list)
     {
@@ -120,9 +122,24 @@ SList<T>::SList(const SList& other)
 }
 
 template<typename T>
+SList<T>::SList(SList&& other) noexcept :
+    m_head(std::exchange(other.m_head, nullptr)),
+    m_tail(std::exchange(other.m_tail, nullptr)),
+    m_size(std::exchange(other.m_size, 0))
+{
+}
+
+template<typename T>
 SList<T>& SList<T>::operator=(const SList& other)
 {
     SList{ other }.swap(*this);
+    return *this;
+}
+
+template<typename T>
+SList<T>& SList<T>::operator=(SList&& other) noexcept
+{
+    SList{ std::move(other) }.swap(*this);
     return *this;
 }
 
