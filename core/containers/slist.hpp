@@ -216,47 +216,50 @@ void SList<T>::push_front(T&& value)
 template<typename T>
 void SList<T>::pop_back() noexcept
 {
-    if (m_head)
+    if (!m_head)
     {
-        if (!m_head->m_next)
-        {
-            delete m_head;
-            m_size--;
-            m_head = nullptr;
-            m_tail = nullptr;
-            return;
-        }
-
-        Node* prev = m_head;
-        Node* curr = m_head->m_next;
-
-        while (curr && curr->m_next)
-        {
-            curr = curr->m_next;
-            prev = prev->m_next;
-        }
-
-        delete curr;
-        prev->m_next = nullptr;
-        m_tail = prev;
-        m_size--;
+        return;
     }
+
+    if (!m_head->m_next)
+    {
+        delete m_head;
+        m_size--;
+        m_head = nullptr;
+        m_tail = nullptr;
+        return;
+    }
+
+    Node* prev = m_head;
+    Node* curr = m_head->m_next;
+
+    while (curr->m_next)
+    {
+        curr = curr->m_next;
+        prev = prev->m_next;
+    }
+
+    delete curr;
+    prev->m_next = nullptr;
+    m_tail = prev;
+    m_size--;
 }
 
 template<typename T>
 void SList<T>::pop_front() noexcept
 {
-    Node* node = m_head;
-
-    if (m_head)
+    if (!m_head)
     {
-        m_head = m_head->m_next;
-        m_size--;
+        return;
+    }
 
-        if (!m_head)
-        {
-            m_tail = nullptr;
-        }
+    Node* node = m_head;
+    m_head = m_head->m_next;
+    m_size--;
+
+    if (!m_head)
+    {
+        m_tail = nullptr;
     }
 
     delete node;
