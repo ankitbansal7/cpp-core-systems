@@ -50,8 +50,9 @@ public:
     using Clock = std::chrono::steady_clock;
     using Duration = std::chrono::duration<double, Ratio>;
 
-    explicit ScopeTimer(std::string label) :
+    explicit ScopeTimer(std::string label, std::ostream& os = std::cout) :
         m_label(std::move(label)),
+        m_os(os),
         m_start(Clock::now())
     {
     }
@@ -65,9 +66,12 @@ public:
     {
         try
         {
+            // std::ostream::operator<< can throw if exceptions are enabled on the stream
+            // (via os.exceptions(...)). That's rare in practice, but a throwing destructor
+            // would call std::terminate, so we swallow it unconditionally.
             const auto end = Clock::now();
             const Duration duration = end - m_start;
-            std::cout << m_label << ": " << duration.count() << ScopeTimerUnitSymbol<Ratio>::value() << "\n";
+            m_os << m_label << ": " << duration.count() << ScopeTimerUnitSymbol<Ratio>::value() << "\n";
         }
         catch (...)
         {
@@ -76,6 +80,7 @@ public:
 
 private:
     std::string m_label;
+    std::ostream& m_os;
     Clock::time_point m_start;
 };
 
