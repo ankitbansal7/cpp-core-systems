@@ -45,12 +45,12 @@ target_include_directories(cpp_core_systems
     $<INSTALL_INTERFACE:core>
 )
 
-# Keep the project's original C++ standard intent (VS template was setting CXX_STANDARD 20).
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET cpp_core_systems PROPERTY CXX_STANDARD 20)
-  set_property(TARGET cpp_core_systems PROPERTY CXX_STANDARD_REQUIRED YES)
-  set_property(TARGET cpp_core_systems PROPERTY CXX_EXTENSIONS NO)
-endif()
+target_compile_features(cpp_core_systems PUBLIC cxx_std_20)
+
+set_target_properties(cpp_core_systems PROPERTIES
+    CXX_STANDARD_REQUIRED YES
+    CXX_EXTENSIONS NO
+)
 
 # ----------------------------
 # Subdirectories

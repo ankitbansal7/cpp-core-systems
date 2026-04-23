@@ -114,5 +114,22 @@ int main()
         //*it = *it + 3; // Fail to compile as it is a const iterator
     }
 
+    SList<int> slist9 = { 1, 2, 3 };
+
+    SList<int>::iterator it = slist9.begin();
+    SList<int>::const_iterator cit = slist9.cbegin();
+
+    if (it == cit)
+    {
+        std::cout << "equal" << std::endl;
+    }
+
+    ++it;
+
+    if (it != cit)
+    {
+        std::cout << "not equal" << std::endl;
+    }
+
     return 0;
 }
