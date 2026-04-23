@@ -29,6 +29,97 @@ class SList
         Node* m_next{ nullptr };
     };
 
+    class Iterator
+    {
+        friend class ConstIterator;
+
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = T*;
+        using reference = T&;
+
+    public:
+        Iterator() = default;
+        explicit Iterator(Node* node) : m_current(node) {}
+
+        Iterator(const Iterator&) = default;
+        Iterator& operator=(const Iterator&) = default;
+        Iterator(Iterator&&) = default;
+        Iterator& operator=(Iterator&&) = default;
+
+        ~Iterator() = default;
+
+        reference operator*() const { return m_current->m_value; }
+        pointer operator->() const { return std::addressof(m_current->m_value); }
+        bool operator==(const Iterator& other) const noexcept { return m_current == other.m_current; }
+        bool operator!=(const Iterator& other) const noexcept { return !(*this == other); }
+
+        Iterator& operator++() noexcept
+        {
+            m_current = m_current->m_next;
+            return *this;
+        }
+
+        Iterator operator++(int) noexcept
+        {
+            Iterator temp = *this;
+            ++(*this);
+            return temp;
+        }
+
+    private:
+        Node* m_current{ nullptr };
+    };
+
+    class ConstIterator
+    {
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const T*;
+        using reference = const T&;
+
+    public:
+        ConstIterator() = default;
+        explicit ConstIterator(const Node* node) : m_current(node) {}
+        ConstIterator(const Iterator& it) : m_current(it.m_current) {}
+
+        ConstIterator(const ConstIterator&) = default;
+        ConstIterator& operator=(const ConstIterator&) = default;
+        ConstIterator(ConstIterator&&) = default;
+        ConstIterator& operator=(ConstIterator&&) = default;
+
+        ~ConstIterator() = default;
+
+        reference operator*() const { return m_current->m_value; }
+        pointer operator->() const { return std::addressof(m_current->m_value); }
+        bool operator==(const ConstIterator& other) const noexcept { return m_current == other.m_current; }
+        bool operator!=(const ConstIterator& other) const noexcept { return !(*this == other); }
+
+        ConstIterator& operator++() noexcept
+        {
+            m_current = m_current->m_next;
+            return *this;
+        }
+
+        ConstIterator operator++(int) noexcept
+        {
+            ConstIterator temp = *this;
+            ++(*this);
+            return temp;
+        }
+
+    private:
+        const Node* m_current{ nullptr };
+    };
+
+public:
+    using iterator = Iterator;
+    using const_iterator = ConstIterator;
+
 public:
     SList() = default;
 
@@ -85,6 +176,13 @@ public:
     inline const T& front() const noexcept { return m_head->m_value; }
     inline T& back() noexcept { return m_tail->m_value; }
     inline const T& back() const noexcept { return m_tail->m_value; }
+
+    inline iterator begin() noexcept { return Iterator(m_head); }
+    inline iterator end() noexcept { return Iterator(nullptr); }
+    inline const_iterator begin() const noexcept { return ConstIterator(m_head); }
+    inline const_iterator end() const noexcept { return ConstIterator(nullptr); }
+    inline const_iterator cbegin() const noexcept { return ConstIterator(m_head); }
+    inline const_iterator cend() const noexcept { return ConstIterator(nullptr); }
 
 private:
     Node* m_head{ nullptr };

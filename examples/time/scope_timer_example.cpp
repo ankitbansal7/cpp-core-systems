@@ -61,7 +61,7 @@ int main()
     print(slist4);
     print(slist5);
     print(slist6);
-    //cout << slist7 << endl;
+    //cout << slist7 << endl; // Fail to compile as Point does not overload operator<<
     slist4.push_back(5);
     cout << slist4 << endl;
     slist4.push_back(int{ 6 });
@@ -82,6 +82,37 @@ int main()
     cout << slist4 << endl;
     cout << slist4.contains(25) << endl;
     cout << slist4.contains(35) << endl;
+
+    cout << "Iterating over slist4:" << endl;
+
+    for (auto it = slist4.begin(); it != slist4.end(); it++)
+    {
+        cout << *it << endl;
+        *it = *it + 2;
+    }
+
+    cout << "Range Iterating over slist4:" << endl;
+
+    for (const auto& value : slist4)
+    {
+        cout << value << endl;
+    }
+
+    const SList<int> slist8{ 10, 20, 30 };
+    cout << "Range Iterating over slist8:" << endl;
+
+    for (const auto& value : slist8)
+    {
+        cout << value << endl;
+    }
+
+    cout << "Const Iterating over slist4:" << endl;
+
+    for (auto it = slist4.cbegin(); it != slist4.cend(); it++)
+    {
+        cout << *it << endl;
+        //*it = *it + 3; // Fail to compile as it is a const iterator
+    }
 
     return 0;
 }
