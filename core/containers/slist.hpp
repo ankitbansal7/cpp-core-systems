@@ -47,6 +47,8 @@ class SList
         template<bool>
         friend class SListIterator;
 
+        friend class SList<T>;
+
     public:
         using iterator_category = std::forward_iterator_tag;
         using value_type = T;
@@ -142,10 +144,15 @@ public:
     template<typename... Args>
     void emplace_front(Args&&... args);
 
+    template<typename... Args>
+    iterator emplace_after(const_iterator pos, Args&&... args);
+
     void push_back(const T& value);
     void push_back(T&& value);
     void push_front(const T& value);
     void push_front(T&& value);
+    iterator insert_after(const_iterator pos, const T& value);
+    iterator insert_after(const_iterator pos, T&& value);
     void pop_back() noexcept;
     void pop_front() noexcept;
     void clear() noexcept;
@@ -286,6 +293,31 @@ void SList<T>::emplace_front(Args&&... args)
 }
 
 template<typename T>
+template<typename... Args>
+SList<T>::iterator SList<T>::emplace_after(SList<T>::const_iterator pos, Args&&... args)
+{
+    NodeBase* current = const_cast<NodeBase*>(pos.m_current);
+    Node* node = new Node(std::forward<Args>(args)...);
+
+    node->set_next(static_cast<Node*>(current->m_next));
+    current->m_next = node;
+
+    if (current == &m_before_head)
+    {
+        m_head = node;
+    }
+
+    if ((m_tail == current) || (m_tail == nullptr))
+    {
+        m_tail = node;
+    }
+
+    m_size++;
+
+    return iterator(node);
+}
+
+template<typename T>
 void SList<T>::push_back(const T& value)
 {
     emplace_back(value);
@@ -307,6 +339,18 @@ template<typename T>
 void SList<T>::push_front(T&& value)
 {
     emplace_front(std::move(value));
+}
+
+template<typename T>
+SList<T>::iterator SList<T>::insert_after(SList<T>::const_iterator pos, const T& value)
+{
+    return emplace_after(pos, value);
+}
+
+template<typename T>
+SList<T>::iterator SList<T>::insert_after(SList<T>::const_iterator pos, T&& value)
+{
+    return emplace_after(pos, std::move(value));
 }
 
 template<typename T>

@@ -131,5 +131,8 @@ int main()
         std::cout << "not equal" << std::endl;
     }
 
+    slist9.insert_after(slist9.before_begin(), 4);
+    cout << slist9 << endl;
+
     return 0;
 }
