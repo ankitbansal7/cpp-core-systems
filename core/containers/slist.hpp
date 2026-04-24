@@ -14,7 +14,13 @@
 template<typename T>
 class SList
 {
-    struct Node
+    struct NodeBase
+    {
+    public:
+        NodeBase* m_next{ nullptr };
+    };
+
+    struct Node : public NodeBase
     {
     public:
         template<typename... Args>
@@ -27,9 +33,12 @@ class SList
 
         ~Node() = default;
 
+        Node* next() noexcept { return static_cast<Node*>(this->m_next); }
+        const Node* next() const noexcept { return static_cast<const Node*>(this->m_next); }
+        void set_next(Node* node) noexcept { this->m_next = node; }
+
     public:
         T m_value;
-        Node* m_next{ nullptr };
     };
 
     template<bool IsConst>
@@ -46,7 +55,8 @@ class SList
         using reference = std::conditional_t<IsConst, const T&, T&>;
 
     private:
-        using NodePtr = std::conditional_t<IsConst, const Node*, Node*>;
+        using NodePtr = std::conditional_t<IsConst, const NodeBase*, NodeBase*>;
+        using ValueNodePtr = std::conditional_t<IsConst, const Node*, Node*>;
 
     public:
         SListIterator() = default;
@@ -62,8 +72,8 @@ class SList
 
         ~SListIterator() = default;
 
-        reference operator*() const { return m_current->m_value; }
-        pointer operator->() const { return std::addressof(m_current->m_value); }
+        reference operator*() const { return static_cast<ValueNodePtr>(m_current)->m_value; }
+        pointer operator->() const { return std::addressof(static_cast<ValueNodePtr>(m_current)->m_value); }
 
         template<bool OtherIsConst>
         bool operator==(const SListIterator<OtherIsConst>& other) const noexcept { return m_current == other.m_current; }
@@ -118,7 +128,7 @@ public:
                 stream << ", ";
             }
 
-            node = node->m_next;
+            node = node->next();
         }
 
         return stream;
@@ -150,13 +160,20 @@ public:
     inline const T& back() const noexcept { return m_tail->m_value; }
 
     inline iterator begin() noexcept { return iterator(m_head); }
-    inline iterator end() noexcept { return iterator(nullptr); }
     inline const_iterator begin() const noexcept { return const_iterator(m_head); }
+    inline const_iterator cbegin() const noexcept { return begin(); }
+    inline iterator end() noexcept { return iterator(nullptr); }
     inline const_iterator end() const noexcept { return const_iterator(nullptr); }
-    inline const_iterator cbegin() const noexcept { return const_iterator(m_head); }
-    inline const_iterator cend() const noexcept { return const_iterator(nullptr); }
+    inline const_iterator cend() const noexcept { return end(); }
+    inline iterator before_begin() noexcept { return iterator(&m_before_head); }
+    inline const_iterator before_begin() const noexcept { return const_iterator(&m_before_head); }
+    inline const_iterator cbefore_begin() const noexcept { return before_begin(); }
 
 private:
+    void sync_before_head() noexcept { m_before_head.m_next = m_head; }
+
+private:
+    NodeBase m_before_head;
     Node* m_head{ nullptr };
     Node* m_tail{ nullptr };
     std::size_t m_size{ 0 };
@@ -168,6 +185,7 @@ SList<T>::SList(T val) :
     m_tail(m_head),
     m_size(1)
 {
+    sync_before_head();
 }
 
 template<typename T>
@@ -177,6 +195,8 @@ SList<T>::SList(std::initializer_list<T> values)
     {
         push_back(value);
     }
+
+    sync_before_head();
 }
 
 template<typename T>
@@ -187,8 +207,10 @@ SList<T>::SList(const SList& other)
     while (temp)
     {
         push_back(temp->m_value);
-        temp = temp->m_next;
+        temp = temp->next();
     }
+
+    sync_before_head();
 }
 
 template<typename T>
@@ -197,6 +219,8 @@ SList<T>::SList(SList&& other) noexcept :
     m_tail(std::exchange(other.m_tail, nullptr)),
     m_size(std::exchange(other.m_size, 0))
 {
+    sync_before_head();
+    other.sync_before_head();
 }
 
 template<typename T>
@@ -229,10 +253,11 @@ void SList<T>::emplace_back(Args&&... args)
     {
         m_head = node;
         m_tail = m_head;
+        sync_before_head();
     }
     else
     {
-        m_tail->m_next = node;
+        m_tail->set_next(node);
         m_tail = node;
     }
 
@@ -252,10 +277,11 @@ void SList<T>::emplace_front(Args&&... args)
     }
     else
     {
-        node->m_next = m_head;
+        node->set_next(m_head);
         m_head = node;
     }
 
+    sync_before_head();
     m_size++;
 }
 
@@ -291,28 +317,30 @@ void SList<T>::pop_back() noexcept
         return;
     }
 
-    if (!m_head->m_next)
+    if (!m_head->next())
     {
         delete m_head;
         m_size--;
         m_head = nullptr;
         m_tail = nullptr;
+        sync_before_head();
         return;
     }
 
     Node* prev = m_head;
-    Node* curr = m_head->m_next;
+    Node* curr = m_head->next();
 
-    while (curr->m_next)
+    while (curr->next())
     {
-        curr = curr->m_next;
-        prev = prev->m_next;
+        curr = curr->next();
+        prev = prev->next();
     }
 
     delete curr;
-    prev->m_next = nullptr;
+    prev->set_next(nullptr);
     m_tail = prev;
     m_size--;
+    sync_before_head();
 }
 
 template<typename T>
@@ -324,7 +352,7 @@ void SList<T>::pop_front() noexcept
     }
 
     Node* node = m_head;
-    m_head = m_head->m_next;
+    m_head = m_head->next();
     m_size--;
 
     if (!m_head)
@@ -333,6 +361,7 @@ void SList<T>::pop_front() noexcept
     }
 
     delete node;
+    sync_before_head();
 }
 
 template<typename T>
@@ -341,22 +370,27 @@ void SList<T>::clear() noexcept
     while (m_head)
     {
         Node* node = m_head;
-        m_head = m_head->m_next;
+        m_head = m_head->next();
         delete node;
     }
 
     m_head = nullptr;
     m_tail = nullptr;
     m_size = 0;
+    sync_before_head();
 }
 
 template<typename T>
 void SList<T>::swap(SList& other) noexcept
 {
     using std::swap;
+
     swap(m_head, other.m_head);
     swap(m_tail, other.m_tail);
     swap(m_size, other.m_size);
+
+    sync_before_head();
+    other.sync_before_head();
 }
 
 template<typename T>
@@ -371,7 +405,7 @@ bool SList<T>::contains(const T& value) const
             return true;
         }
 
-        node = node->m_next;
+        node = node->next();
     }
 
     return false;
