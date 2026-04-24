@@ -155,6 +155,8 @@ public:
     iterator insert_after(const_iterator pos, T&& value);
     void pop_back() noexcept;
     void pop_front() noexcept;
+    iterator erase_after(const_iterator pos);
+    iterator erase_after(const_iterator first, const_iterator last);
     void clear() noexcept;
     void swap(SList& other) noexcept;
     bool contains(const T& value) const;
@@ -313,6 +315,7 @@ SList<T>::iterator SList<T>::emplace_after(SList<T>::const_iterator pos, Args&&.
     }
 
     m_size++;
+    sync_before_head();
 
     return iterator(node);
 }
@@ -406,6 +409,43 @@ void SList<T>::pop_front() noexcept
 
     delete node;
     sync_before_head();
+}
+
+template<typename T>
+SList<T>::iterator SList<T>::erase_after(SList<T>::const_iterator pos)
+{
+    NodeBase* current = const_cast<NodeBase*>(pos.m_current);
+    Node* node_to_erase = static_cast<Node*>(current->m_next);
+    NodeBase* next = node_to_erase->m_next;
+
+    current->m_next = next;
+
+    if (node_to_erase == m_head)
+    {
+        m_head = static_cast<Node*>(next);
+    }
+
+    if (node_to_erase == m_tail)
+    {
+        m_tail = (current == &m_before_head) ? nullptr : static_cast<Node*>(current);
+    }
+
+    delete node_to_erase;
+    --m_size;
+    sync_before_head();
+
+    return iterator(next);
+}
+
+template<typename T>
+SList<T>::iterator SList<T>::erase_after(SList<T>::const_iterator first, SList<T>::const_iterator last)
+{
+    while (first.m_current->m_next != last.m_current)
+    {
+        erase_after(first);
+    }
+
+    return iterator(const_cast<NodeBase*>(last.m_current));
 }
 
 template<typename T>

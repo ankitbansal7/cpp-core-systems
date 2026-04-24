@@ -138,6 +138,35 @@ int main()
     pts.emplace_back(1.0, 1.5);
     std::cout << "points: " << pts << " size=" << pts.size() << '\n';
 
+    print_header("emplace_after / insert_after / erase_after / before_begin");
+    SList<int> seq{ 1, 2, 3, 4, 5 };
+    std::cout << "seq: " << seq << '\n';
+
+    // insert at front using before_begin + emplace_after
+    seq.emplace_after(seq.cbefore_begin(), 0);
+    std::cout << "after emplace_after(cbefore_begin(), 0): " << seq << '\n';
+
+    // insert after first element
+    seq.insert_after(seq.begin(), 9);
+    std::cout << "after insert_after(begin(), 9): " << seq << '\n';
+
+    // erase the element after the first element
+    seq.erase_after(seq.begin());
+    std::cout << "after erase_after(begin()): " << seq << '\n';
+
+    // erase a range: remove elements 20 and 30 from the list below
+    SList<int> r{ 10, 20, 30, 40, 50 };
+    std::cout << "r before range erase: " << r << '\n';
+    auto first = r.begin();           // points to 10
+    auto last = r.begin(); ++last; ++last; ++last; // advance last to point to 40
+    // erase elements after 'first' until reaching 'last' (removes 20 and 30)
+    r.erase_after(first, last);
+    std::cout << "r after erase_after(first, last) removing range: " << r << '\n';
+
+    // emplace_after with custom type
+    pts.emplace_after(pts.cbefore_begin(), Point(3.3, 4.4));
+    std::cout << "pts after emplace_after at front: " << pts << '\n';
+
     print_header("Collected values");
     auto values = collect(c);
     std::cout << "collected moved elements:";

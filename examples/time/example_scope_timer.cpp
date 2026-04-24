@@ -133,6 +133,20 @@ int main()
 
     slist9.insert_after(slist9.before_begin(), 4);
     cout << slist9 << endl;
+    slist9.erase_after(slist9.begin());
+    cout << slist9 << endl;
+    slist9.erase_after(slist9.before_begin());
+    cout << slist9 << endl;
+    auto slist9_it = slist9.begin();
+    slist9_it++;
+    slist9.erase_after(it);
+    cout << slist9 << endl;
+
+    auto slist2_it = slist2.begin();
+    slist2_it++;
+    slist2_it++;
+    slist2.erase_after(slist2.before_begin(), slist2_it);
+    cout << slist2 << endl;
 
     return 0;
 }
