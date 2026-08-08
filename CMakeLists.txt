@@ -22,7 +22,7 @@ option(CPP_CORE_SYSTEMS_BUILD_BENCHMARKS "Build benchmarks" OFF)
 # Library target: cpp_core_systems
 # ----------------------------
 # Visual Studio template created an executable from cpp_core_systems.cpp/cpp_core_systems.h.
-# Convert to a library with sources under src/ and public headers under core/.
+# Convert to a library with sources under src/ and public headers under include/.
 file(GLOB_RECURSE CPP_CORE_SYSTEMS_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
@@ -41,8 +41,8 @@ add_library(cpp_core_systems::cpp_core_systems ALIAS cpp_core_systems)
 
 target_include_directories(cpp_core_systems
   PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/core>
-    $<INSTALL_INTERFACE:core>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
 
 target_compile_features(cpp_core_systems PUBLIC cxx_std_20)
