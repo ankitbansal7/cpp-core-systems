@@ -38,6 +38,14 @@
             }
         },
         {
+            "name": "x64-debug-tests",
+            "displayName": "x64 Debug (Tests)",
+            "inherits": "x64-debug",
+            "cacheVariables": {
+                "CPP_CORE_SYSTEMS_BUILD_TESTS": "ON"
+            }
+        },
+        {
             "name": "x86-debug",
             "displayName": "x86 Debug",
             "inherits": "windows-base",
@@ -55,6 +63,23 @@
             "inherits": "x86-debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "x64-debug-tests",
+            "displayName": "x64 Debug (Tests)",
+            "configurePreset": "x64-debug-tests"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "x64-debug-tests",
+            "displayName": "x64 Debug (Tests)",
+            "configurePreset": "x64-debug-tests",
+            "output": {
+                "outputOnFailure": true
             }
         }
     ]

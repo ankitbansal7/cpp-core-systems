@@ -1,15 +1,24 @@
 # Tests for cpp_core_systems
+#
+# GoogleTest is pulled in via FetchContent so contributors don't need a
+# system-wide install. CTest/enable_testing() is already set up by the
+# top-level CMakeLists (via include(CTest) inside the BUILD_TESTS block).
 
-add_executable(cpp_core_systems_tests
-  test_basic.cpp
+include(FetchContent)
+
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG        v1.15.2
 )
 
-target_link_libraries(cpp_core_systems_tests
-  PRIVATE cpp_core_systems::cpp_core_systems
-)
+# On Windows, force GoogleTest to use the shared (DLL) C runtime so it matches
+# the rest of the build and avoids CRT-mismatch link errors.
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
-# Register with CTest
-add_test(
-  NAME cpp_core_systems_tests
-  COMMAND cpp_core_systems_tests
-)
+FetchContent_MakeAvailable(googletest)
+
+# Provides gtest_discover_tests(), which registers each TEST() with CTest.
+include(GoogleTest)
+
+add_subdirectory(containers)
