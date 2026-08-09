@@ -3,12 +3,7 @@
 
 #include <cstdio>
 
-#ifdef _WIN32
-#include <WinSock2.h>
-#else
-#include <unistd.h>
-#endif
-
+#include "net/platform.hpp"
 #include "net/socket_error.hpp"
 
 class SocketHandle

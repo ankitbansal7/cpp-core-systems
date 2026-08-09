@@ -3,12 +3,7 @@
 
 #include <string>
 
-#ifdef _WIN32
-#include <WinSock2.h>
-#else
-#include <cerrno>
-#include <cstring>
-#endif
+#include "net/platform.hpp"
 
 // Lightweight, header-only helper for retrieving and formatting the last
 // socket-related error in a platform-independent way.
