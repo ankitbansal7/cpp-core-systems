@@ -1,6 +1,8 @@
 #ifndef SOCKET_HANDLE_HPP
 #define SOCKET_HANDLE_HPP
 
+#include <cstdio>
+
 #ifdef _WIN32
 #include <WinSock2.h>
 #else
@@ -97,11 +99,11 @@ public:
 #ifndef NDEBUG
         if (result != 0)
         {
-            SocketError::Code code = SocketError::Last();
+            SocketError error = SocketError::Last();
             std::fprintf(stderr,
-                "SocketHandle::Close failed (handle=%d): %s\n",
-                static_cast<int>(m_handle),
-                SocketError::ToString(code).c_str());
+                "SocketHandle::Close failed (handle=%lld): %s\n",
+                static_cast<long long>(m_handle),
+                error.Message().c_str());
         }
 #else
         (void)result;

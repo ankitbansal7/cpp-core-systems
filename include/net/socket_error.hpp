@@ -38,7 +38,7 @@ public:
             FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
             FORMAT_MESSAGE_IGNORE_INSERTS,
             nullptr,
-            static_cast<DWORD>(code),
+            static_cast<DWORD>(m_code),
             MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
             reinterpret_cast<char*>(&msgBuffer),
             0,
@@ -58,7 +58,7 @@ public:
         }
         else
         {
-            result = "Unknown error " + std::to_string(code);
+            result = "Unknown error " + std::to_string(m_code);
         }
 
         if (msgBuffer != nullptr)
@@ -73,15 +73,15 @@ public:
         char buffer[256] = {};
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
         // GNU-specific strerror_r returns char*, may not use buffer.
-        return std::string(::strerror_r(code, buffer, sizeof(buffer)));
+        return std::string(::strerror_r(m_code, buffer, sizeof(buffer)));
 #else
         // POSIX/XSI-compliant strerror_r returns int.
-        if (::strerror_r(code, buffer, sizeof(buffer)) == 0)
+        if (::strerror_r(m_code, buffer, sizeof(buffer)) == 0)
         {
             return std::string(buffer);
         }
 
-        return "Unknown error " + std::to_string(code);
+        return "Unknown error " + std::to_string(m_code);
 #endif
 #endif
     }
