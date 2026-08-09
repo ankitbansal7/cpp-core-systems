@@ -86,6 +86,60 @@ public:
 #endif
     }
 
+    bool IsWouldBlock() const noexcept
+    {
+#ifdef _WIN32
+        return m_code == WSAEWOULDBLOCK;
+#else
+        return m_code == EAGAIN || m_code == EWOULDBLOCK;
+#endif
+    }
+
+    bool IsInterrupted() const noexcept
+    {
+#ifdef _WIN32
+        return m_code == WSAEINTR;
+#else
+        return m_code == EINTR;
+#endif
+    }
+
+    bool IsConnectionReset() const noexcept
+    {
+#ifdef _WIN32
+        return m_code == WSAECONNRESET;
+#else
+        return m_code == ECONNRESET;
+#endif
+    }
+
+    bool IsConnectionRefused() const noexcept
+    {
+#ifdef _WIN32
+        return m_code == WSAECONNREFUSED;
+#else
+        return m_code == ECONNREFUSED;
+#endif
+    }
+
+    bool IsTimedOut() const noexcept
+    {
+#ifdef _WIN32
+        return m_code == WSAETIMEDOUT;
+#else
+        return m_code == ETIMEDOUT;
+#endif
+    }
+
+    bool IsAddressInUse() const noexcept
+    {
+#ifdef _WIN32
+        return m_code == WSAEADDRINUSE;
+#else
+        return m_code == EADDRINUSE;
+#endif
+    }
+
     // Captures the current last-error value (errno on POSIX, WSAGetLastError on Windows).
     static SocketError Last() noexcept
     {
