@@ -47,6 +47,13 @@ target_include_directories(cpp_core_systems
 
 target_compile_features(cpp_core_systems PUBLIC cxx_std_20)
 
+# The net/ headers are header-only but call into Winsock, so anything that
+# includes them needs the import library. PUBLIC propagates it to consumers,
+# which keeps examples, tests, and benchmarks from each repeating this.
+if (WIN32)
+  target_link_libraries(cpp_core_systems PUBLIC ws2_32)
+endif()
+
 set_target_properties(cpp_core_systems PROPERTIES
     CXX_STANDARD_REQUIRED YES
     CXX_EXTENSIONS NO
