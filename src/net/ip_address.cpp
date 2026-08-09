@@ -79,3 +79,29 @@ std::string IPAddress::ToString() const
     return std::string{ buffer };
 }
 
+std::size_t IPAddress::Hash() const noexcept
+{
+    constexpr std::size_t offset =
+        (sizeof(std::size_t) == 8)
+        ? 14695981039346656037ull
+        : 2166136261u;
+
+    constexpr std::size_t prime =
+        (sizeof(std::size_t) == 8)
+        ? 1099511628211ull
+        : 16777619u;
+
+    std::size_t hash = offset;
+    const std::size_t byteCount = (m_version == IPVersion::IPv4 ? 4 : 16);
+
+    hash ^= static_cast<std::size_t>(m_version);
+    hash *= prime;
+
+    for (std::size_t i = 0; i < byteCount; ++i)
+    {
+        hash ^= m_bytes[i];
+        hash *= prime;
+    }
+
+    return hash;
+}

@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <utility>
+#include <unordered_set>
 
 #include "net/socket_handle.hpp"
 #include "net/socket_error.hpp"
@@ -169,6 +170,7 @@ int main()
         std::cout << "invalid address\n";
     }
 
+    std::unordered_set<IPAddress> addresses;
 
     return 0;
 }
