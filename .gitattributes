@@ -1,0 +1,9 @@
+# Store every text file with LF in the repository, and check it out with LF
+# too. This overrides each machine's core.autocrlf setting, so the working
+# copy looks the same on Windows, Linux, and macOS.
+* text=auto eol=lf
+
+# Windows shells require CRLF in batch files; a LF-only .bat can misbehave
+# around labels and goto.
+*.bat text eol=crlf
+*.cmd text eol=crlf
