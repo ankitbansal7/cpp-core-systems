@@ -9,6 +9,7 @@
 #include <iterator>
 #include <memory>
 #include <concepts>
+#include <limits>
 
 #include "utils/traits.hpp"
 
@@ -102,14 +103,21 @@ class SList
     };
 
 public:
+    using value_type = T;
+    using reference = T&;
+    using const_reference = const T&;
+    using pointer = T*;
+    using const_pointer = const T*;
+    using difference_type = std::ptrdiff_t;
+    using size_type = std::size_t;
     using iterator = SListIterator<false>;
     using const_iterator = SListIterator<true>;
 
 public:
     SList() = default;
 
-    explicit SList(T val);
-    SList(std::initializer_list<T> values);
+    explicit SList(value_type val);
+    SList(std::initializer_list<value_type> values);
     SList(const SList& other);
     SList(SList&& other) noexcept;
 
@@ -172,26 +180,27 @@ public:
     template<typename... Args>
     iterator emplace_after(const_iterator pos, Args&&... args);
 
-    void push_back(const T& value);
-    void push_back(T&& value);
-    void push_front(const T& value);
-    void push_front(T&& value);
-    iterator insert_after(const_iterator pos, const T& value);
-    iterator insert_after(const_iterator pos, T&& value);
+    void push_back(const value_type& value);
+    void push_back(value_type&& value);
+    void push_front(const value_type& value);
+    void push_front(value_type&& value);
+    iterator insert_after(const_iterator pos, const value_type& value);
+    iterator insert_after(const_iterator pos, value_type&& value);
     void pop_back() noexcept;
     void pop_front() noexcept;
     iterator erase_after(const_iterator pos);
     iterator erase_after(const_iterator first, const_iterator last);
     void clear() noexcept;
     void swap(SList& other) noexcept;
-    bool contains(const T& value) const;
+    bool contains(const value_type& value) const;
 
-    inline std::size_t size() const noexcept { return m_size; }
+    inline size_type size() const noexcept { return m_size; }
+    inline size_type max_size() const noexcept { return std::numeric_limits<size_type>::max() / sizeof(Node); }
     inline bool empty() const noexcept { return (m_size == 0); }
-    inline T& front() noexcept { return m_head->m_value; }
-    inline const T& front() const noexcept { return m_head->m_value; }
-    inline T& back() noexcept { return m_tail->m_value; }
-    inline const T& back() const noexcept { return m_tail->m_value; }
+    inline reference front() noexcept { return m_head->m_value; }
+    inline const_reference front() const noexcept { return m_head->m_value; }
+    inline reference back() noexcept { return m_tail->m_value; }
+    inline const_reference back() const noexcept { return m_tail->m_value; }
 
     inline iterator begin() noexcept { return iterator(m_head); }
     inline const_iterator begin() const noexcept { return const_iterator(m_head); }
@@ -210,11 +219,11 @@ private:
     NodeBase m_before_head;
     Node* m_head{ nullptr };
     Node* m_tail{ nullptr };
-    std::size_t m_size{ 0 };
+    size_type m_size{ 0 };
 };
 
 template<typename T>
-SList<T>::SList(T val) :
+SList<T>::SList(value_type val) :
     m_head(new Node(std::move(val))),
     m_tail(m_head),
     m_size(1)
@@ -223,11 +232,11 @@ SList<T>::SList(T val) :
 }
 
 template<typename T>
-SList<T>::SList(std::initializer_list<T> values)
+SList<T>::SList(std::initializer_list<value_type> values)
 {
     SList temp;
 
-    for (const T& value : values)
+    for (const auto& value : values)
     {
         temp.push_back(value);
     }
@@ -240,7 +249,7 @@ SList<T>::SList(const SList& other)
 {
     SList temp;
 
-    for (const T& value : other)
+    for (const auto& value : other)
     {
         temp.push_back(value);
     }
@@ -347,37 +356,37 @@ SList<T>::iterator SList<T>::emplace_after(SList<T>::const_iterator pos, Args&&.
 }
 
 template<typename T>
-void SList<T>::push_back(const T& value)
+void SList<T>::push_back(const value_type& value)
 {
     emplace_back(value);
 }
 
 template<typename T>
-void SList<T>::push_back(T&& value)
+void SList<T>::push_back(value_type&& value)
 {
     emplace_back(std::move(value));
 }
 
 template<typename T>
-void SList<T>::push_front(const T& value)
+void SList<T>::push_front(const value_type& value)
 {
     emplace_front(value);
 }
 
 template<typename T>
-void SList<T>::push_front(T&& value)
+void SList<T>::push_front(value_type&& value)
 {
     emplace_front(std::move(value));
 }
 
 template<typename T>
-SList<T>::iterator SList<T>::insert_after(SList<T>::const_iterator pos, const T& value)
+SList<T>::iterator SList<T>::insert_after(SList<T>::const_iterator pos, const value_type& value)
 {
     return emplace_after(pos, value);
 }
 
 template<typename T>
-SList<T>::iterator SList<T>::insert_after(SList<T>::const_iterator pos, T&& value)
+SList<T>::iterator SList<T>::insert_after(SList<T>::const_iterator pos, value_type&& value)
 {
     return emplace_after(pos, std::move(value));
 }
@@ -504,7 +513,7 @@ void SList<T>::swap(SList& other) noexcept
 }
 
 template<typename T>
-bool SList<T>::contains(const T& value) const
+bool SList<T>::contains(const value_type& value) const
 {
     const Node* node = m_head;
 
