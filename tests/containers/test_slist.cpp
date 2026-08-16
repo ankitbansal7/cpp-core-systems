@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <any>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -39,6 +41,39 @@ namespace
     };
 
     int Tracker::alive = 0;
+
+    // Throws from its copy constructor once a configurable number of copies has
+    // succeeded, so that a half-built list can be checked for leaked elements.
+    struct ThrowOnCopy
+    {
+        static int alive;
+        static int copies_before_throw;          // negative disables throwing
+
+        int value{ 0 };
+
+        explicit ThrowOnCopy(int v) : value(v) { ++alive; }
+
+        ThrowOnCopy(const ThrowOnCopy& other) : value(other.value)
+        {
+            if (copies_before_throw == 0)
+            {
+                throw std::runtime_error("copy failed");
+            }
+
+            if (copies_before_throw > 0)
+            {
+                --copies_before_throw;
+            }
+
+            ++alive;                             // only once the copy has survived
+        }
+
+        ThrowOnCopy& operator=(const ThrowOnCopy&) = default;
+        ~ThrowOnCopy() { --alive; }
+    };
+
+    int ThrowOnCopy::alive = 0;
+    int ThrowOnCopy::copies_before_throw = -1;
 }
 
 // ----------------------------------------------------------------------------
@@ -261,6 +296,24 @@ TEST(SListCopyMove, MovedFromListIsReusable)
     EXPECT_EQ(to_vector(source), (std::vector<int>{ 6, 7 }));
 }
 
+// Assignment must not list-initialize its temporary: for an element type that is
+// constructible from the list itself (std::any and friends), braces would select
+// the initializer_list constructor and collapse the source into one element.
+TEST(SListCopyMove, AssignmentDoesNotWrapGreedyElementTypes)
+{
+    SList<std::any> source;
+    source.push_back(std::any(1));
+    source.push_back(std::any(2));
+
+    SList<std::any> copy;
+    copy = source;
+    EXPECT_EQ(copy.size(), 2u);
+
+    SList<std::any> moved;
+    moved = std::move(source);
+    EXPECT_EQ(moved.size(), 2u);
+}
+
 TEST(SListModifiers, SwapExchangesContents)
 {
     SList<int> a{ 1, 2, 3 };
@@ -379,4 +432,34 @@ TEST(SListResource, DestructorReleasesEveryNode)
         EXPECT_EQ(Tracker::alive, 3);
     }
     EXPECT_EQ(Tracker::alive, 0);   // no leaks, no double-frees
+}
+
+TEST(SListResource, CopyConstructorLeaksNothingWhenElementThrows)
+{
+    SList<ThrowOnCopy> source;
+    source.push_back(ThrowOnCopy(1));
+    source.push_back(ThrowOnCopy(2));
+    source.push_back(ThrowOnCopy(3));
+
+    const int before = ThrowOnCopy::alive;
+    ThrowOnCopy::copies_before_throw = 2;        // fail on the third element
+
+    EXPECT_THROW({ SList<ThrowOnCopy> copy(source); }, std::runtime_error);
+
+    ThrowOnCopy::copies_before_throw = -1;
+    EXPECT_EQ(ThrowOnCopy::alive, before);       // the two copies made are released
+    EXPECT_EQ(source.size(), 3u);                // source is untouched
+}
+
+TEST(SListResource, InitializerListConstructorLeaksNothingWhenElementThrows)
+{
+    const int before = ThrowOnCopy::alive;
+    ThrowOnCopy::copies_before_throw = 2;        // fail on the third element
+
+    EXPECT_THROW(
+        (SList<ThrowOnCopy>{ ThrowOnCopy(1), ThrowOnCopy(2), ThrowOnCopy(3) }),
+        std::runtime_error);
+
+    ThrowOnCopy::copies_before_throw = -1;
+    EXPECT_EQ(ThrowOnCopy::alive, before);
 }

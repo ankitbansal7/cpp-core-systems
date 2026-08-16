@@ -200,26 +200,27 @@ SList<T>::SList(T val) :
 template<typename T>
 SList<T>::SList(std::initializer_list<T> values)
 {
+    SList temp;
+
     for (const T& value : values)
     {
-        push_back(value);
+        temp.push_back(value);
     }
 
-    sync_before_head();
+    swap(temp);
 }
 
 template<typename T>
 SList<T>::SList(const SList& other)
 {
-    const Node* temp = other.m_head;
+    SList temp;
 
-    while (temp)
+    for (const T& value : other)
     {
-        push_back(temp->m_value);
-        temp = temp->next();
+        temp.push_back(value);
     }
 
-    sync_before_head();
+    swap(temp);
 }
 
 template<typename T>
@@ -235,14 +236,14 @@ SList<T>::SList(SList&& other) noexcept :
 template<typename T>
 SList<T>& SList<T>::operator=(const SList& other)
 {
-    SList{ other }.swap(*this);
+    SList(other).swap(*this);
     return *this;
 }
 
 template<typename T>
 SList<T>& SList<T>::operator=(SList&& other) noexcept
 {
-    SList{ std::move(other) }.swap(*this);
+    SList(std::move(other)).swap(*this);
     return *this;
 }
 
