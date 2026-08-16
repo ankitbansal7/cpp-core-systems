@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <any>
+#include <concepts>
+#include <ostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -74,6 +76,26 @@ namespace
 
     int ThrowOnCopy::alive = 0;
     int ThrowOnCopy::copies_before_throw = -1;
+
+    // A user-defined type that is both comparable and streamable, used to check
+    // that SList's operators forward to the element type's own operators.
+    struct Point
+    {
+        int x{ 0 };
+        int y{ 0 };
+
+        bool operator==(const Point&) const = default;
+    };
+
+    std::ostream& operator<<(std::ostream& stream, const Point& point)
+    {
+        return stream << '(' << point.x << ',' << point.y << ')';
+    }
+
+    // Element types that support neither operator, used to check that SList's
+    // constrained operators drop out instead of hard-erroring in the body.
+    struct NotComparable { int v{ 0 }; };
+    struct NotStreamable { int v{ 0 }; };
 }
 
 // ----------------------------------------------------------------------------
@@ -351,6 +373,162 @@ TEST(SListLookup, Contains)
 }
 
 // ----------------------------------------------------------------------------
+// Comparison
+// ----------------------------------------------------------------------------
+
+TEST(SListComparison, EmptyListsAreEqual)
+{
+    SList<int> a;
+    SList<int> b;
+
+    EXPECT_TRUE(a == b);                         // size guard passes, loop never runs
+    EXPECT_FALSE(a != b);
+}
+
+TEST(SListComparison, EqualContentsCompareEqual)
+{
+    SList<int> a{ 1, 2, 3 };
+    SList<int> b{ 1, 2, 3 };
+
+    EXPECT_EQ(a, b);
+    EXPECT_FALSE(a != b);
+}
+
+TEST(SListComparison, ListIsEqualToItself)
+{
+    SList<int> a{ 1, 2, 3 };
+    EXPECT_EQ(a, a);
+
+    SList<int> empty;
+    EXPECT_EQ(empty, empty);
+}
+
+TEST(SListComparison, DifferenceAtHeadIsDetected)
+{
+    SList<int> a{ 1, 2, 3 };
+    SList<int> b{ 9, 2, 3 };
+
+    EXPECT_NE(a, b);
+}
+
+TEST(SListComparison, DifferenceAtTailIsDetected)
+{
+    SList<int> a{ 1, 2, 3 };
+    SList<int> b{ 1, 2, 9 };
+
+    EXPECT_NE(a, b);
+}
+
+TEST(SListComparison, DifferentSizesCompareUnequalBothWays)
+{
+    SList<int> shorter{ 1, 2, 3 };
+    SList<int> longer{ 1, 2, 3, 4 };
+
+    // Both directions matter: the size guard is what keeps the walk from
+    // running off the end of the shorter list.
+    EXPECT_NE(shorter, longer);
+    EXPECT_NE(longer, shorter);
+}
+
+TEST(SListComparison, EmptyIsUnequalToNonEmptyBothWays)
+{
+    SList<int> empty;
+    SList<int> filled{ 1 };
+
+    EXPECT_NE(empty, filled);
+    EXPECT_NE(filled, empty);
+}
+
+TEST(SListComparison, ListsEmptiedByDifferentRoutesAreEqual)
+{
+    SList<int> fresh;
+
+    SList<int> cleared{ 1, 2, 3 };
+    cleared.clear();
+
+    SList<int> popped{ 5 };
+    popped.pop_front();
+
+    SList<int> drained{ 5 };
+    drained.pop_back();
+
+    SList<int> source{ 1, 2 };
+    SList<int> sink(std::move(source));          // source is now empty
+
+    EXPECT_EQ(cleared, fresh);
+    EXPECT_EQ(popped, fresh);
+    EXPECT_EQ(drained, fresh);
+    EXPECT_EQ(source, fresh);
+}
+
+TEST(SListComparison, CopyEqualsOriginalAndIsIndependent)
+{
+    SList<int> original{ 1, 2, 3 };
+    SList<int> copy(original);
+    EXPECT_EQ(copy, original);
+
+    copy.push_back(4);
+    EXPECT_NE(copy, original);
+}
+
+TEST(SListComparison, ComparesElementsNotAddresses)
+{
+    // Distinct nodes holding equal values must compare equal; a memberwise
+    // (pointer) comparison would report these as different.
+    SList<int> a{ 1, 2, 3 };
+    SList<int> b;
+    b.push_back(1);
+    b.push_back(2);
+    b.push_back(3);
+
+    EXPECT_EQ(a, b);
+}
+
+TEST(SListComparison, UsesElementEqualityOperator)
+{
+    SList<Point> a{ Point{ 1, 2 }, Point{ 3, 4 } };
+    SList<Point> b{ Point{ 1, 2 }, Point{ 3, 4 } };
+    SList<Point> c{ Point{ 1, 2 }, Point{ 3, 5 } };
+
+    EXPECT_EQ(a, b);
+    EXPECT_NE(a, c);
+}
+
+TEST(SListComparison, WorksForNonTrivialElements)
+{
+    SList<std::string> a{ "alpha", "beta" };
+    SList<std::string> b{ "alpha", "beta" };
+    SList<std::string> c{ "alpha", "gamma" };
+
+    EXPECT_EQ(a, b);
+    EXPECT_NE(a, c);
+}
+
+TEST(SListComparison, EqualityIsConstrainedOnTheElementType)
+{
+    // The requires clause must make the concept honest: without it, SList<T>
+    // claims to be equality comparable for any T and hard-errors on use.
+    static_assert(std::equality_comparable<SList<int>>);
+    static_assert(std::equality_comparable<SList<Point>>);
+    static_assert(std::equality_comparable<SList<std::string>>);
+    static_assert(!std::equality_comparable<NotComparable>);
+    static_assert(!std::equality_comparable<SList<NotComparable>>);
+
+    // Nested lists work because SList<int> is itself equality comparable.
+    static_assert(std::equality_comparable<SList<SList<int>>>);
+
+    // A non-comparable element type must still give a usable container.
+    SList<NotComparable> list;
+    list.push_back(NotComparable{ 1 });
+    list.push_back(NotComparable{ 2 });
+    SList<NotComparable> copy(list);
+    copy.pop_front();
+
+    EXPECT_EQ(list.size(), 2u);
+    EXPECT_EQ(copy.size(), 1u);
+}
+
+// ----------------------------------------------------------------------------
 // Iterators
 // ----------------------------------------------------------------------------
 
@@ -409,12 +587,115 @@ TEST(SListIterator, ConstListIsIterable)
 // Streaming
 // ----------------------------------------------------------------------------
 
+namespace
+{
+    template<typename T>
+    std::string to_string(const SList<T>& list)
+    {
+        std::ostringstream oss;
+        oss << list;
+        return oss.str();
+    }
+}
+
 TEST(SListStream, OstreamOperatorFormatsCommaSeparated)
 {
     SList<int> list{ 1, 2, 3 };
     std::ostringstream oss;
     oss << list;
     EXPECT_EQ(oss.str(), "1, 2, 3");
+}
+
+TEST(SListStream, EmptyListStreamsNothing)
+{
+    SList<int> list;
+    EXPECT_EQ(to_string(list), "");
+}
+
+TEST(SListStream, SingleElementHasNoSeparator)
+{
+    // The only case where m_head == m_tail, i.e. the boundary of the
+    // "print a separator unless this is the tail" condition.
+    SList<int> list{ 7 };
+    EXPECT_EQ(to_string(list), "7");
+}
+
+TEST(SListStream, TwoElementsAreSeparatedOnce)
+{
+    SList<int> list{ 7, 8 };
+    EXPECT_EQ(to_string(list), "7, 8");
+}
+
+TEST(SListStream, DuplicateValuesAreStillSeparated)
+{
+    // The separator test compares node addresses, not values. Comparing values
+    // would suppress every separator here and print "555".
+    SList<int> list{ 5, 5, 5 };
+    EXPECT_EQ(to_string(list), "5, 5, 5");
+}
+
+TEST(SListStream, OutputTracksMutations)
+{
+    // Separator placement depends on m_tail, so streaming after each mutation
+    // doubles as a check that the tail pointer stayed correct.
+    SList<int> list{ 1, 2, 3 };
+
+    list.pop_back();
+    EXPECT_EQ(to_string(list), "1, 2");
+
+    list.pop_front();
+    EXPECT_EQ(to_string(list), "2");
+
+    list.push_back(9);
+    EXPECT_EQ(to_string(list), "2, 9");
+
+    list.clear();
+    EXPECT_EQ(to_string(list), "");
+
+    list.push_front(4);
+    EXPECT_EQ(to_string(list), "4");
+}
+
+TEST(SListStream, OutputIsCorrectAfterEraseAfter)
+{
+    SList<int> middle{ 1, 2, 3 };
+    middle.erase_after(middle.cbegin());         // removes 2
+    EXPECT_EQ(to_string(middle), "1, 3");
+
+    SList<int> tail{ 1, 2, 3 };
+    auto pos = tail.cbegin();
+    ++pos;
+    tail.erase_after(pos);                       // removes the tail, 3
+    EXPECT_EQ(to_string(tail), "1, 2");
+}
+
+TEST(SListStream, SupportsChaining)
+{
+    SList<int> a{ 1, 2, 3 };
+    SList<int> b{ 7 };
+
+    std::ostringstream oss;
+    oss << a << " | " << b;                      // must return the stream
+    EXPECT_EQ(oss.str(), "1, 2, 3 | 7");
+}
+
+TEST(SListStream, UsesElementStreamOperator)
+{
+    SList<Point> list{ Point{ 1, 2 }, Point{ 3, 4 } };
+    EXPECT_EQ(to_string(list), "(1,2), (3,4)");
+}
+
+TEST(SListStream, StreamingIsConstrainedOnTheElementType)
+{
+    static_assert(has_ostream_operator<SList<int>>::value);
+    static_assert(has_ostream_operator<SList<Point>>::value);
+    static_assert(!has_ostream_operator<NotStreamable>::value);
+    static_assert(!has_ostream_operator<SList<NotStreamable>>::value);
+
+    // A non-streamable element type must still give a usable container.
+    SList<NotStreamable> list;
+    list.push_back(NotStreamable{ 1 });
+    EXPECT_EQ(list.size(), 1u);
 }
 
 // ----------------------------------------------------------------------------

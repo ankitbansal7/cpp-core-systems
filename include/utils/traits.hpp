@@ -3,6 +3,7 @@
 
 #include <type_traits>
 #include <utility>
+#include <ostream>
 
 template<typename T>
 class has_ostream_operator

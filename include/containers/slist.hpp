@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <iterator>
 #include <memory>
+#include <concepts>
 
 #include "utils/traits.hpp"
 
@@ -116,9 +117,8 @@ public:
     SList& operator=(SList&& other) noexcept;
 
     friend std::ostream& operator<<(std::ostream& stream, const SList& list)
+        requires has_ostream_operator<T>::value
     {
-        static_assert(has_ostream_operator<T>::value, "SList Type must overload operator<<");
-
         const Node* node = list.m_head;
 
         while (node)
@@ -134,6 +134,31 @@ public:
         }
 
         return stream;
+    }
+
+    friend bool operator==(const SList& lhs, const SList& rhs)
+        requires std::equality_comparable<T>
+    {
+        if (lhs.m_size != rhs.m_size)
+        {
+            return false;
+        }
+
+        const Node* a = lhs.m_head;
+        const Node* b = rhs.m_head;
+
+        while (a)
+        {
+            if (!(a->m_value == b->m_value))
+            {
+                return false;
+            }
+
+            a = a->next();
+            b = b->next();
+        }
+
+        return true;
     }
 
     ~SList() noexcept;
