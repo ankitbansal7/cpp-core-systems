@@ -7,30 +7,14 @@
 #include <utility>
 #include <type_traits>
 #include <cstdint>
+#include <sstream>
+#include <ratio>
 
-template <typename Ratio>
-struct ScopeTimerUnitSymbol
+namespace ccs
 {
-    static constexpr const char* value() { return " (custom)"; }
-};
 
-template <>
-struct ScopeTimerUnitSymbol<std::milli>
+namespace detail
 {
-    static constexpr const char* value() { return " ms"; }
-};
-
-template <>
-struct ScopeTimerUnitSymbol<std::micro>
-{
-    static constexpr const char* value() { return " us"; }
-};
-
-template <>
-struct ScopeTimerUnitSymbol<std::nano>
-{
-    static constexpr const char* value() { return " ns"; }
-};
 
 template<typename>
 struct is_ratio_type : std::false_type {};
@@ -38,11 +22,13 @@ struct is_ratio_type : std::false_type {};
 template<std::intmax_t N, std::intmax_t D>
 struct is_ratio_type<std::ratio<N, D>> : std::true_type {};
 
+}
+
 template <typename Ratio>
 class ScopeTimer
 {
     static_assert(
-        is_ratio_type<Ratio>::value,
+        detail::is_ratio_type<Ratio>::value,
         "ScopeTimer<Ratio>: Ratio must be a std::ratio type"
         );
 
@@ -50,6 +36,7 @@ public:
     using Clock = std::chrono::steady_clock;
     using Duration = std::chrono::duration<double, Ratio>;
 
+    [[nodiscard("A ScopeTimer temporary measures nothing; name the variable.")]]
     explicit ScopeTimer(std::string label, std::ostream& os = std::cout) :
         m_label(std::move(label)),
         m_os(os),
@@ -71,7 +58,10 @@ public:
             // would call std::terminate, so we swallow it unconditionally.
             const auto end = Clock::now();
             const Duration duration = end - m_start;
-            m_os << m_label << ": " << duration.count() << ScopeTimerUnitSymbol<Ratio>::value() << "\n";
+            std::ostringstream oss; // fresh stream: default flags, default locale
+            oss.precision(15);
+            oss << m_label << ": " << duration << "\n";
+            m_os << oss.str(); // one insertion
         }
         catch (...)
         {
@@ -84,6 +74,8 @@ private:
     Clock::time_point m_start;
 };
 
+} // namespace ccs
+
 #if defined(__COUNTER__)
 #define SCOPE_TIMER_UNIQUE_ID __COUNTER__
 #else
@@ -93,14 +85,17 @@ private:
 #define SCOPE_TIMER_CONCAT_INNER(a, b) a##b
 #define SCOPE_TIMER_CONCAT(a, b) SCOPE_TIMER_CONCAT_INNER(a, b)
 
+#define SCOPE_TIMER_SEC(label) \
+  ccs::ScopeTimer<std::ratio<1>> SCOPE_TIMER_CONCAT(scope_timer_, SCOPE_TIMER_UNIQUE_ID)(label)
+
 #define SCOPE_TIMER_MILLI(label) \
-  ScopeTimer<std::milli> SCOPE_TIMER_CONCAT(scope_timer_, SCOPE_TIMER_UNIQUE_ID)(label)
+  ccs::ScopeTimer<std::milli> SCOPE_TIMER_CONCAT(scope_timer_, SCOPE_TIMER_UNIQUE_ID)(label)
 
 #define SCOPE_TIMER_MICRO(label) \
-  ScopeTimer<std::micro> SCOPE_TIMER_CONCAT(scope_timer_, SCOPE_TIMER_UNIQUE_ID)(label)
+  ccs::ScopeTimer<std::micro> SCOPE_TIMER_CONCAT(scope_timer_, SCOPE_TIMER_UNIQUE_ID)(label)
 
 #define SCOPE_TIMER_NANO(label) \
-  ScopeTimer<std::nano> SCOPE_TIMER_CONCAT(scope_timer_, SCOPE_TIMER_UNIQUE_ID)(label)
+  ccs::ScopeTimer<std::nano> SCOPE_TIMER_CONCAT(scope_timer_, SCOPE_TIMER_UNIQUE_ID)(label)
 
 #define SCOPE_TIMER(label) SCOPE_TIMER_MILLI(label)
 

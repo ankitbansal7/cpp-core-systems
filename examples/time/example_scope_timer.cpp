@@ -15,22 +15,24 @@ struct Point
 
 int main()
 {
-    SCOPE_TIMER("HelloWorld");
+    SCOPE_TIMER_MILLI("HelloWorld");
 
     {
-        SCOPE_TIMER("Sleep_test");
+        SCOPE_TIMER_MICRO("Sleep_test");
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     {
-        SCOPE_TIMER("String_test");
+        SCOPE_TIMER_SEC("String_test");
         std::this_thread::sleep_for(std::chrono::milliseconds(15));
     }
 
     {
-        SCOPE_TIMER("Default");
+        SCOPE_TIMER_NANO("Default");
         std::this_thread::sleep_for(std::chrono::milliseconds(15));
     }
+
+    ccs::ScopeTimer<ratio<1, 60>> custom("custom");
 
     int a = 25;
     Point p1 = { 2.6, 8.5 };
