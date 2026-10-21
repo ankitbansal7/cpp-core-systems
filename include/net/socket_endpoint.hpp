@@ -150,8 +150,7 @@ public:
     [[nodiscard]]
     bool operator==(const SocketEndpoint& other) const noexcept
     {
-        return (m_address == other.m_address) && (m_port == other.m_port) &&
-            (m_scopeId == other.m_scopeId);
+        return (m_address == other.m_address) && (m_port == other.m_port) && (m_scopeId == other.m_scopeId);
     }
 
     [[nodiscard]]

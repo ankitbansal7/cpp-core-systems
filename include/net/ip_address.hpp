@@ -31,8 +31,7 @@ private:
 
 public:
     [[nodiscard]]
-    static std::optional<IPAddress> FromBytes(std::span<const std::uint8_t> bytes,
-        IPVersion version) noexcept
+    static std::optional<IPAddress> FromBytes(std::span<const std::uint8_t> bytes, IPVersion version) noexcept
     {
         if (version != IPVersion::IPv4 && version != IPVersion::IPv6)
         {
@@ -40,6 +39,7 @@ public:
         }
 
         const std::size_t expected = (version == IPVersion::IPv4) ? IPV4_BYTE_COUNT : IPV6_BYTE_COUNT;
+
         if (bytes.size() != expected)
         {
             return std::nullopt;
