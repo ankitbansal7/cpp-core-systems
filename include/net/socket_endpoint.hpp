@@ -15,9 +15,10 @@ class SocketEndpoint final
 public:
     SocketEndpoint() noexcept = default;
 
-    SocketEndpoint(const IPAddress& address, std::uint16_t port) noexcept
+    SocketEndpoint(const IPAddress& address, std::uint16_t port, std::uint32_t scopeId = 0) noexcept
         : m_address(address)
         , m_port(port)
+        , m_scopeId(address.GetVersion() == IPVersion::IPv6 ? scopeId : 0)
     {
     }
 
@@ -40,11 +41,18 @@ public:
     }
 
     [[nodiscard]]
+    std::uint32_t GetScopeId() const noexcept
+    {
+        return m_scopeId;
+    }
+
+    [[nodiscard]]
     std::string ToString() const
     {
         if (m_address.GetVersion() == IPVersion::IPv6)
         {
-            return "[" + m_address.ToString() + "]:" + std::to_string(m_port);
+            const auto scope = m_scopeId == 0 ? std::string{} : "%" + std::to_string(m_scopeId);
+            return "[" + m_address.ToString() + scope + "]:" + std::to_string(m_port);
         }
 
         return m_address.ToString() + ":" + std::to_string(m_port);
@@ -84,6 +92,7 @@ public:
 
             addr6->sin6_family = AF_INET6;
             addr6->sin6_port = htons(m_port);
+            addr6->sin6_scope_id = m_scopeId;
             std::memcpy(&addr6->sin6_addr, m_address.Bytes(), IPAddress::IPV6_BYTE_COUNT);
             length = sizeof(sockaddr_in6);
         }
@@ -131,7 +140,7 @@ public:
 
             if (auto ip = IPAddress::FromBytes(bytes, IPVersion::IPv6))
             {
-                return SocketEndpoint{ *ip, ntohs(addr6->sin6_port) };
+                return SocketEndpoint{ *ip, ntohs(addr6->sin6_port), addr6->sin6_scope_id };
             }
         }
 
@@ -141,7 +150,8 @@ public:
     [[nodiscard]]
     bool operator==(const SocketEndpoint& other) const noexcept
     {
-        return (m_address == other.m_address) && (m_port == other.m_port);
+        return (m_address == other.m_address) && (m_port == other.m_port) &&
+            (m_scopeId == other.m_scopeId);
     }
 
     [[nodiscard]]
@@ -153,5 +163,6 @@ public:
 private:
     IPAddress m_address{ IPAddress::Any(IPVersion::IPv4) };
     std::uint16_t m_port{ 0 };
+    std::uint32_t m_scopeId{ 0 };
 };
 

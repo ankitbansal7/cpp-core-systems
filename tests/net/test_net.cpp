@@ -24,3 +24,19 @@ TEST(SocketEndpoint, NativeRoundTrip)
         EXPECT_EQ(*restored, original);
     }
 }
+
+TEST(SocketEndpoint, PreservesIPv6Scope)
+{
+    const auto address = IPAddress::Parse("fe80::1");
+    ASSERT_TRUE(address);
+    const SocketEndpoint original{ *address, 8080, 7 };
+    const auto [storage, length] = original.ToNative();
+    const auto restored = SocketEndpoint::FromNative(
+        reinterpret_cast<const sockaddr*>(&storage), length);
+    ASSERT_TRUE(restored);
+    EXPECT_EQ(restored->GetScopeId(), 7u);
+    EXPECT_EQ(*restored, original);
+    EXPECT_EQ(restored->ToString(), "[fe80::1%7]:8080");
+    EXPECT_NE(original, (SocketEndpoint{ *address, 8080, 8 }));
+    EXPECT_EQ((SocketEndpoint{ IPAddress::Loopback(IPVersion::IPv4), 80, 7 }).GetScopeId(), 0u);
+}
