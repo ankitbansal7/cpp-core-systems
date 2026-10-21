@@ -8,6 +8,9 @@
 #include <array>
 #include <cstdint>
 #include <cstddef>
+#include <algorithm>
+#include <cstring>
+#include <functional>
 
 enum class IPVersion
 {

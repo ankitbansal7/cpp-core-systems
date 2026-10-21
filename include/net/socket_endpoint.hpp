@@ -1,11 +1,14 @@
 #pragma once
 
 #include "net/platform.hpp"
+#include "net/ip_address.hpp"
 
 #include <cstdint>
 #include <string>
 #include <optional>
 #include <cstring>
+#include <array>
+#include <utility>
 
 class SocketEndpoint final
 {
