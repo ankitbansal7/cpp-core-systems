@@ -54,6 +54,11 @@ public:
     [[nodiscard]]
     static std::optional<IPAddress> Parse(std::string_view address)
     {
+        if (address.find('\0') != std::string_view::npos)
+        {
+            return std::nullopt;
+        }
+
         std::string addressStr(address);
         IPAddress result;
         in_addr ipv4{};

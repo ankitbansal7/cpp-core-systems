@@ -1,6 +1,18 @@
 #include "net/socket_endpoint.hpp"
 #include <gtest/gtest.h>
 
+TEST(IPAddress, RejectsEmbeddedNuls)
+{
+    using namespace std::string_view_literals;
+    EXPECT_FALSE(IPAddress::Parse("127.0.0.1\0junk"sv));
+    EXPECT_FALSE(IPAddress::Parse("::1\0junk"sv));
+    EXPECT_FALSE(IPAddress::Parse("127.0.0.1\0"sv));
+    EXPECT_FALSE(IPAddress::Parse("\0::1"sv));
+    EXPECT_TRUE(IPAddress::Parse("127.0.0.1"));
+    EXPECT_TRUE(IPAddress::Parse("::1"));
+    EXPECT_FALSE(IPAddress::Parse(""));
+}
+
 TEST(IPAddress, FromBytesValidatesVersionAndSize)
 {
     const std::array<std::uint8_t, 4> bytes{ 127, 0, 0, 1 };
