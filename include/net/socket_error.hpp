@@ -1,141 +1,101 @@
-#ifndef SOCKET_ERROR_HPP
-#define SOCKET_ERROR_HPP
+#pragma once
 
 #include <string>
+#include <system_error>
 
 #include "net/platform.hpp"
 
 // Lightweight, header-only helper for retrieving and formatting the last
 // socket-related error in a platform-independent way.
-class SocketError
+class SocketError final
 {
 public:
-    using ErrorCode = int;
+    constexpr SocketError() noexcept = default;
 
-public:
-    explicit SocketError(ErrorCode code) noexcept
-        : m_code(code)
+    explicit SocketError(int code) noexcept
+        : m_ec(code, std::system_category())
+    {
+    }
+
+    explicit SocketError(std::error_code ec) noexcept
+        : m_ec(ec)
     {
     }
 
     [[nodiscard]]
-    ErrorCode Code() const noexcept
+    int Code() const noexcept
     {
-        return m_code;
+        return m_ec.value();
+    }
+
+    [[nodiscard]]
+    const std::error_code& ErrorCode() const noexcept
+    {
+        return m_ec;
     }
 
     [[nodiscard]]
     std::string Message() const
     {
-#ifdef _WIN32
-        char* msgBuffer = nullptr;
-        DWORD length = ::FormatMessageA(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-            nullptr,
-            static_cast<DWORD>(m_code),
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            reinterpret_cast<char*>(&msgBuffer),
-            0,
-            nullptr);
-
-        std::string result;
-
-        if (length > 0 && msgBuffer != nullptr)
-        {
-            result.assign(msgBuffer, length);
-
-            // FormatMessage often appends a trailing CRLF; trim it.
-            while (!result.empty() && ((result.back() == '\n') || (result.back() == '\r')))
-            {
-                result.pop_back();
-            }
-        }
-        else
-        {
-            result = "Unknown error " + std::to_string(m_code);
-        }
-
-        if (msgBuffer != nullptr)
-        {
-            ::LocalFree(msgBuffer);
-        }
-
-        return result;
-#else
-        // strerror is not guaranteed thread-safe on all platforms; use the
-        // reentrant variant where available.
-        char buffer[256] = {};
-#if defined(__GLIBC__) && defined(_GNU_SOURCE)
-        // GNU-specific strerror_r returns char*, may not use buffer.
-        return std::string(::strerror_r(m_code, buffer, sizeof(buffer)));
-#else
-        // POSIX/XSI-compliant strerror_r returns int.
-        if (::strerror_r(m_code, buffer, sizeof(buffer)) == 0)
-        {
-            return std::string(buffer);
-        }
-
-        return "Unknown error " + std::to_string(m_code);
-#endif
-#endif
+        // std::system_category().message() delegates to FormatMessageA on Windows 
+        // and strerror_r (or equivalent) on POSIX.
+        return m_ec.message();
     }
 
+    // Checking against std::errc allows cross-platform comparison,
+    // as std::system_category maps WSAE* and errno codes to generic std::errc conditions.
+    [[nodiscard]]
     bool IsWouldBlock() const noexcept
     {
-#ifdef _WIN32
-        return m_code == WSAEWOULDBLOCK;
-#else
-        return m_code == EAGAIN || m_code == EWOULDBLOCK;
-#endif
+        return (m_ec == std::errc::operation_would_block) ||
+            (m_ec == std::errc::resource_unavailable_try_again);
     }
 
+    [[nodiscard]]
     bool IsInterrupted() const noexcept
     {
-#ifdef _WIN32
-        return m_code == WSAEINTR;
-#else
-        return m_code == EINTR;
-#endif
+        return (m_ec == std::errc::interrupted);
     }
 
+    [[nodiscard]]
     bool IsConnectionReset() const noexcept
     {
-#ifdef _WIN32
-        return m_code == WSAECONNRESET;
-#else
-        return m_code == ECONNRESET;
-#endif
+        return (m_ec == std::errc::connection_reset);
     }
 
+    [[nodiscard]]
     bool IsConnectionRefused() const noexcept
     {
-#ifdef _WIN32
-        return m_code == WSAECONNREFUSED;
-#else
-        return m_code == ECONNREFUSED;
-#endif
+        return (m_ec == std::errc::connection_refused);
     }
 
+    [[nodiscard]]
     bool IsTimedOut() const noexcept
     {
-#ifdef _WIN32
-        return m_code == WSAETIMEDOUT;
-#else
-        return m_code == ETIMEDOUT;
-#endif
+        return (m_ec == std::errc::timed_out);
     }
 
+    [[nodiscard]]
     bool IsAddressInUse() const noexcept
     {
-#ifdef _WIN32
-        return m_code == WSAEADDRINUSE;
-#else
-        return m_code == EADDRINUSE;
-#endif
+        return (m_ec == std::errc::address_in_use);
     }
 
-    // Captures the current last-error value (errno on POSIX, WSAGetLastError on Windows).
+    // Temporary network issues where retrying immediately or after a delay makes sense
+    [[nodiscard]]
+    bool IsTransient() const noexcept
+    {
+        return (IsWouldBlock() || IsInterrupted() || IsTimedOut());
+    }
+
+    // Disconnections that signal the peer is gone
+    [[nodiscard]]
+    bool IsDisconnected() const noexcept
+    {
+        return IsConnectionReset() || (m_ec == std::errc::broken_pipe);
+    }
+
+    [[nodiscard]]
     static SocketError Last() noexcept
     {
 #ifdef _WIN32
@@ -145,8 +105,65 @@ public:
 #endif
     }
 
+    // Implicit conversion to bool for checking success/failure
+    explicit operator bool() const noexcept
+    {
+        return static_cast<bool>(m_ec);
+    }
+
+    // --- SocketError vs. SocketError ---
+    [[nodiscard]]
+    friend bool operator==(const SocketError& lhs, const SocketError& rhs) noexcept
+    {
+        return lhs.m_ec == rhs.m_ec;
+    }
+
+    [[nodiscard]]
+    friend bool operator!=(const SocketError& lhs, const SocketError& rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
+    // --- SocketError vs. std::errc (Cross-Platform) ---
+    [[nodiscard]]
+    friend bool operator==(const SocketError& lhs, std::errc rhs) noexcept
+    {
+        return lhs.m_ec == rhs;
+    }
+
+    [[nodiscard]]
+    friend bool operator!=(const SocketError& lhs, std::errc rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
+    // --- SocketError vs. Raw Code (int) ---
+    [[nodiscard]]
+    friend bool operator==(const SocketError& lhs, int rhs) noexcept
+    {
+        return lhs.Code() == rhs;
+    }
+
+    [[nodiscard]]
+    friend bool operator!=(const SocketError& lhs, int rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
+    // --- SocketError vs. std::error_code ---
+    [[nodiscard]]
+    friend bool operator==(const SocketError& lhs, std::error_code rhs) noexcept
+    {
+        return lhs.m_ec == rhs;
+    }
+
+    [[nodiscard]]
+    friend bool operator!=(const SocketError& lhs, std::error_code rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
 private:
-    ErrorCode m_code{ 0 };
+    std::error_code m_ec{};
 };
 
-#endif // SOCKET_ERROR_HPP

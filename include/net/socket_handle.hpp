@@ -1,12 +1,13 @@
-#ifndef SOCKET_HANDLE_HPP
-#define SOCKET_HANDLE_HPP
-
-#include <cstdio>
+#pragma once
 
 #include "net/platform.hpp"
 #include "net/socket_error.hpp"
 
-class SocketHandle
+#include <utility>
+#include <cstdio>
+#include <cstdint>
+
+class SocketHandle final
 {
 public:
 #ifdef _WIN32
@@ -30,6 +31,7 @@ public:
         Close();
     }
 
+    // Move-only semantics
     SocketHandle(const SocketHandle&) = delete;
     SocketHandle& operator=(const SocketHandle&) = delete;
 
@@ -42,8 +44,7 @@ public:
     {
         if (this != &other)
         {
-            Close();
-            m_handle = other.Release();
+            Reset(other.Release());
         }
 
         return *this;
@@ -52,7 +53,13 @@ public:
     [[nodiscard]]
     bool IsValid() const noexcept
     {
-        return (m_handle != InvalidHandle);
+        return m_handle != InvalidHandle;
+    }
+
+    [[nodiscard]]
+    explicit operator bool() const noexcept
+    {
+        return IsValid();
     }
 
     [[nodiscard]]
@@ -64,9 +71,7 @@ public:
     [[nodiscard]]
     NativeHandle Release() noexcept
     {
-        NativeHandle handle = m_handle;
-        m_handle = InvalidHandle;
-        return handle;
+        return std::exchange(m_handle, InvalidHandle);
     }
 
     void Reset(NativeHandle handle = InvalidHandle) noexcept
@@ -85,10 +90,12 @@ public:
             return;
         }
 
+        NativeHandle handleToClose = std::exchange(m_handle, InvalidHandle);
+
 #ifdef _WIN32
-        int result = ::closesocket(m_handle);
+        int result = ::closesocket(handleToClose);
 #else
-        int result = ::close(m_handle);
+        int result = ::close(handleToClose);
 #endif
 
 #ifndef NDEBUG
@@ -96,19 +103,25 @@ public:
         {
             SocketError error = SocketError::Last();
             std::fprintf(stderr,
-                "SocketHandle::Close failed (handle=%lld): %s\n",
-                static_cast<long long>(m_handle),
+                "SocketHandle::Close failed (handle=%llu): %s\n",
+                static_cast<unsigned long long>(handleToClose),
                 error.Message().c_str());
         }
-#else
-        (void)result;
 #endif
+    }
 
-        m_handle = InvalidHandle;
+    void Swap(SocketHandle& other) noexcept
+    {
+        using std::swap;
+        swap(m_handle, other.m_handle);
+    }
+
+    friend void swap(SocketHandle& a, SocketHandle& b) noexcept
+    {
+        a.Swap(b);
     }
 
 private:
     NativeHandle m_handle{ InvalidHandle };
 };
 
-#endif // SOCKET_HANDLE_HPP

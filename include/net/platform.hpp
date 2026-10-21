@@ -1,5 +1,4 @@
-#ifndef PLATFORM_HPP
-#define PLATFORM_HPP
+#pragma once
 
 // The one place the platform socket headers get pulled in. Every other header
 // under net/ includes this first and never includes a system socket header
@@ -43,4 +42,3 @@
 
 #endif
 
-#endif // PLATFORM_HPP
