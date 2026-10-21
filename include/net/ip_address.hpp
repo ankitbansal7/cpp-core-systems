@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstring>
 #include <functional>
+#include <span>
 
 enum class IPVersion
 {
@@ -29,6 +30,27 @@ private:
     IPAddress() = default;
 
 public:
+    [[nodiscard]]
+    static std::optional<IPAddress> FromBytes(std::span<const std::uint8_t> bytes,
+        IPVersion version) noexcept
+    {
+        if (version != IPVersion::IPv4 && version != IPVersion::IPv6)
+        {
+            return std::nullopt;
+        }
+
+        const std::size_t expected = (version == IPVersion::IPv4) ? IPV4_BYTE_COUNT : IPV6_BYTE_COUNT;
+        if (bytes.size() != expected)
+        {
+            return std::nullopt;
+        }
+
+        IPAddress address;
+        address.m_version = version;
+        std::copy(bytes.begin(), bytes.end(), address.m_bytes.begin());
+        return address;
+    }
+
     [[nodiscard]]
     static std::optional<IPAddress> Parse(std::string_view address)
     {

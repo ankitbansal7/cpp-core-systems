@@ -22,3 +22,4 @@ FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
 
 add_subdirectory(containers)
+add_subdirectory(net)
