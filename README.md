@@ -65,10 +65,16 @@ cmake --build out/build/x64-release --target bench_tcp
 On Linux:
 
 ```bash
-cmake -S . -B out/build/linux-benchmarks -DCMAKE_BUILD_TYPE=Release -DCPP_CORE_SYSTEMS_BUILD_BENCHMARKS=ON
-cmake --build out/build/linux-benchmarks --target bench_tcp
-./out/build/linux-benchmarks/benchmarks/bench_tcp
+bash scripts/run-benchmarks.sh
+# Optional: round-trip count and stream size in MiB
+bash scripts/run-benchmarks.sh 1000 16
 ```
+
+The script configures a Release build in `out/build/linux-benchmarks`, builds
+`bench_tcp`, and forwards arguments to it. Subsequent runs reuse the build
+directory. It works from any directory when invoked by its absolute path and
+returns a nonzero status if configuration, compilation, or the benchmark fails.
+Use `bash scripts/run-benchmarks.sh --help` for workload limits and defaults.
 
 Results include the OS networking stack and thread scheduling costs. They are
 end-to-end loopback measurements, not isolated wrapper overhead or physical
