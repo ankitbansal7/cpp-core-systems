@@ -1,6 +1,6 @@
 #include "net/tcp_socket.hpp"
 #include "net/socket_runtime.hpp"
-#include "tcp_test_support.hpp"
+#include "socket_test_support.hpp"
 
 #include <array>
 #include <type_traits>
@@ -47,11 +47,11 @@ namespace
             ASSERT_EQ(::listen(listener.Get(), 4), 0);
             const auto connected = client.Connect(endpoint);
             ASSERT_TRUE(connected) << connected.Error();
-            ASSERT_TRUE(tcp_test::SetTimeouts(client.GetNativeHandle()));
-            ASSERT_TRUE(tcp_test::IsReadable(listener.Get()));
+            ASSERT_TRUE(socket_test::SetTimeouts(client.GetNativeHandle()));
+            ASSERT_TRUE(socket_test::IsReadable(listener.Get()));
             peer.Reset(::accept(listener.Get(), nullptr, nullptr));
             ASSERT_TRUE(peer) << SocketError::Last();
-            ASSERT_TRUE(tcp_test::SetTimeouts(peer.Get()));
+            ASSERT_TRUE(socket_test::SetTimeouts(peer.Get()));
         }
 
         SocketRuntime runtime;

@@ -142,6 +142,7 @@ TEST(SocketError, ClassifiesWinsockErrors)
         { WSAEADDRINUSE, std::errc::address_in_use },
         { WSAECONNABORTED, std::errc::connection_aborted },
         { WSAENOTCONN, std::errc::not_connected },
+        { WSAEMSGSIZE, std::errc::message_size },
     };
 
     for (const auto& [code, condition] : cases)

@@ -41,6 +41,30 @@ In Visual Studio, select **x64 Debug (Tests)**, configure CMake, and select
 `example_tcp_loopback.exe` to run the example. The tests share the `test_net`
 executable and are discovered individually after building it.
 
+## UDP networking
+
+`UdpSocket` is a move-only blocking IPv4/IPv6 datagram socket. Call
+`Bind(endpoint)` to receive on a chosen address; port zero selects an available
+port. `SendTo(buffer, destination)` sends one complete datagram and automatically
+creates/binds the socket on first use if necessary. An existing socket keeps its
+address family; close it before rebinding. Keep `SocketRuntime` alive until all
+sockets have been destroyed.
+
+`ReceiveFrom(buffer)` returns `SocketResult<UdpReceiveResult>` containing
+`BytesReceived` and the `Sender` endpoint, so replies can go to that sender.
+Empty buffers still send/consume a datagram: zero bytes means an empty message,
+not TCP-style EOF. If a received datagram exceeds the buffer, the whole datagram
+is consumed, excess bytes are discarded, and the result reports
+`std::errc::message_size`. Do not process buffer contents after a failed receive
+or split a UDP message into multiple send calls. UDP does not guarantee delivery
+or ordering; applications must implement any required retries or deadlines.
+
+[example_udp_loopback.cpp](examples/net/example_udp_loopback.cpp) demonstrates a
+local request/reply and an empty datagram, with receive timeouts. Build the
+`example_udp_loopback` target and run it from Visual Studio's startup dropdown,
+or run `out/build/x64-debug-tests/examples/example_udp_loopback.exe` after building
+with the test preset. UDP tests are included in `test_net`.
+
 ## TCP benchmark
 
 `bench_tcp` measures mean round-trip time for 64-byte messages and one-way

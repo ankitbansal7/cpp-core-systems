@@ -7,7 +7,7 @@
 #include <sys/select.h>
 #endif
 
-namespace tcp_test
+namespace socket_test
 {
     inline bool SetTimeouts(SocketHandle::NativeHandle handle)
     {

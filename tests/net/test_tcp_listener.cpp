@@ -1,6 +1,6 @@
 #include "net/tcp_listener.hpp"
 #include "net/socket_runtime.hpp"
-#include "tcp_test_support.hpp"
+#include "socket_test_support.hpp"
 
 #include <array>
 #include <type_traits>
@@ -83,12 +83,12 @@ TEST_P(TcpListenerTest, BindListenAndAcceptHaveDistinctRoles)
     ASSERT_TRUE(listener.Listen(4));
     TcpSocket client;
     ASSERT_TRUE(client.Connect(endpoint));
-    ASSERT_TRUE(tcp_test::SetTimeouts(client.GetNativeHandle()));
-    ASSERT_TRUE(tcp_test::IsReadable(listener.GetNativeHandle()));
+    ASSERT_TRUE(socket_test::SetTimeouts(client.GetNativeHandle()));
+    ASSERT_TRUE(socket_test::IsReadable(listener.GetNativeHandle()));
     auto accepted = listener.Accept();
     ASSERT_TRUE(accepted) << accepted.Error();
     auto server = std::move(accepted).Value();
-    ASSERT_TRUE(tcp_test::SetTimeouts(server.GetNativeHandle()));
+    ASSERT_TRUE(socket_test::SetTimeouts(server.GetNativeHandle()));
     const auto serverLocal = server.GetLocalEndpoint();
     const auto serverPeer = server.GetPeerEndpoint();
     const auto clientLocal = client.GetLocalEndpoint();
@@ -115,12 +115,12 @@ TEST_P(TcpListenerTest, AcceptsMultipleConnectionsAndAcceptedSocketsOutliveListe
     for (std::size_t index = 0; index < clients.size(); ++index)
     {
         ASSERT_TRUE(clients[index].Connect(endpoint));
-        ASSERT_TRUE(tcp_test::SetTimeouts(clients[index].GetNativeHandle()));
-        ASSERT_TRUE(tcp_test::IsReadable(listener.GetNativeHandle()));
+        ASSERT_TRUE(socket_test::SetTimeouts(clients[index].GetNativeHandle()));
+        ASSERT_TRUE(socket_test::IsReadable(listener.GetNativeHandle()));
         auto accepted = listener.Accept();
         ASSERT_TRUE(accepted) << accepted.Error();
         servers[index] = std::move(accepted).Value();
-        ASSERT_TRUE(tcp_test::SetTimeouts(servers[index].GetNativeHandle()));
+        ASSERT_TRUE(socket_test::SetTimeouts(servers[index].GetNativeHandle()));
     }
     listener.Close();
     EXPECT_FALSE(listener);
@@ -159,7 +159,7 @@ TEST_P(TcpListenerTest, MovesKeepListeningAndCloseAllowsRebinding)
     EXPECT_EQ(assigned.GetNativeHandle(), native);
     TcpSocket client;
     ASSERT_TRUE(client.Connect(endpoint));
-    ASSERT_TRUE(tcp_test::IsReadable(assigned.GetNativeHandle()));
+    ASSERT_TRUE(socket_test::IsReadable(assigned.GetNativeHandle()));
     auto accepted = assigned.Accept();
     ASSERT_TRUE(accepted) << accepted.Error();
     assigned.Close();

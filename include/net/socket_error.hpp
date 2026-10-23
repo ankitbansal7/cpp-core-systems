@@ -225,6 +225,8 @@ private:
                 return condition == std::errc::connection_aborted;
             case WSAENOTCONN:
                 return condition == std::errc::not_connected;
+            case WSAEMSGSIZE:
+                return condition == std::errc::message_size;
             default:
                 break;
             }
