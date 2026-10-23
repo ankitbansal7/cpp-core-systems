@@ -1,9 +1,9 @@
 # Benchmarks for cpp_core_systems
 
-add_executable(cpp_core_systems_bench_basic
-  bench_basic.cpp
-)
+find_package(Threads REQUIRED)
 
-target_link_libraries(cpp_core_systems_bench_basic
-  PRIVATE cpp_core_systems::cpp_core_systems
+add_executable(bench_tcp net/bench_tcp.cpp)
+target_link_libraries(bench_tcp PRIVATE
+  cpp_core_systems::cpp_core_systems
+  Threads::Threads
 )

@@ -41,6 +41,39 @@ In Visual Studio, select **x64 Debug (Tests)**, configure CMake, and select
 `example_tcp_loopback.exe` to run the example. The tests share the `test_net`
 executable and are discovered individually after building it.
 
+## TCP benchmark
+
+`bench_tcp` measures mean round-trip time for 64-byte messages and one-way
+stream throughput with 64 KiB send buffers on IPv4 loopback. It uses a dedicated
+server thread, handles partial transfers, and checks errors and received byte
+counts. Socket I/O has five-second timeouts. The round-trip measurement excludes
+256 warmup exchanges and enables `TCP_NODELAY` on both endpoints. The stream
+measurement leaves Nagle's algorithm enabled and ends when the receiver has
+consumed all bytes. Connection setup, thread creation, and buffer allocation
+are outside the timed sections.
+
+Build the benchmark in Release. From a Visual Studio developer shell:
+
+```powershell
+cmake --preset x64-release -DCPP_CORE_SYSTEMS_BUILD_BENCHMARKS=ON
+cmake --build out/build/x64-release --target bench_tcp
+.\out\build\x64-release\benchmarks\bench_tcp.exe
+# Optional: round-trip count and stream size in MiB
+.\out\build\x64-release\benchmarks\bench_tcp.exe 1000 16
+```
+
+On Linux:
+
+```bash
+cmake -S . -B out/build/linux-benchmarks -DCMAKE_BUILD_TYPE=Release -DCPP_CORE_SYSTEMS_BUILD_BENCHMARKS=ON
+cmake --build out/build/linux-benchmarks --target bench_tcp
+./out/build/linux-benchmarks/benchmarks/bench_tcp
+```
+
+Results include the OS networking stack and thread scheduling costs. They are
+end-to-end loopback measurements, not isolated wrapper overhead or physical
+network performance. Repeat runs under comparable system load to compare changes.
+
 ## Linux setup
 
 Install a C++20-capable compiler, CMake 3.20 or newer, Git, and Make
