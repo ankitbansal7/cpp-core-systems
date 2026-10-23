@@ -2,6 +2,45 @@
 Low-level C++ runtime and systems foundations with performance-focused experiments.
 This repository is used as a personal reference and learning codebase.
 
+## TCP networking
+
+`TcpSocket` is a move-only blocking TCP connection. Call `Connect(endpoint)` on
+a default-constructed socket to create a client. `TcpListener` provides the
+server side: call `Bind(endpoint)`, `Listen()`, then `Accept()` for each client.
+Each accepted `TcpSocket` owns its connection independently of the listener.
+Both support IPv4 and IPv6 numeric endpoints. Keep a `SocketRuntime` alive until
+all sockets and listeners have been destroyed.
+
+Operations return `SocketResult<T>` rather than throwing socket errors. Check
+the result before calling `Value()`; use `Error()` on failure. `Send` and
+`Receive` return the number of bytes transferred and may transfer only part of
+the buffer. A successful receive of zero bytes into a nonempty buffer signals
+peer EOF. Empty buffers are successful no-ops. `Shutdown(SocketShutdown::Send)`
+signals EOF to the peer while allowing responses to be received. `Close()` and
+destruction release the native handle. `IsValid()` reports handle ownership,
+not whether the peer is still connected.
+
+These initial APIs block and do not impose deadlines or resolve hostnames.
+`GetNativeHandle()` borrows the handle for platform-specific socket options;
+do not close it directly. Concurrent mutation or closing of the same object
+requires external coordination.
+
+[example_tcp_loopback.cpp](examples/net/example_tcp_loopback.cpp) runs a small
+client/server echo exchange entirely on loopback using an OS-selected port.
+It handles partial transfers and half-close without requiring a separate server.
+On Windows, from a Visual Studio developer shell:
+
+```powershell
+cmake --preset x64-debug-tests
+cmake --build --preset x64-debug-tests --target example_tcp_loopback test_net
+.\out\build\x64-debug-tests\examples\example_tcp_loopback.exe
+ctest --preset x64-debug-tests -L net
+```
+
+In Visual Studio, select **x64 Debug (Tests)**, configure CMake, and select
+`example_tcp_loopback.exe` to run the example. The tests share the `test_net`
+executable and are discovered individually after building it.
+
 ## Linux setup
 
 Install a C++20-capable compiler, CMake 3.20 or newer, Git, and Make
