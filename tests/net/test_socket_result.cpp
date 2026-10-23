@@ -18,6 +18,18 @@ static_assert(std::is_same_v<decltype(std::declval<const SocketResult<int>&>().V
 static_assert(std::is_same_v<decltype(std::declval<SocketResult<int>&&>().Value()), int&&>);
 static_assert(std::is_same_v<decltype(std::declval<const SocketResult<int>&&>().Value()), const int&&>);
 
+static_assert(noexcept(SocketResult<int>::Success(1)));
+static_assert(noexcept(SocketResult<int>::Failure(SocketError{ 1 })));
+static_assert(noexcept(std::declval<SocketResult<int>&>().Value()));
+static_assert(noexcept(std::declval<const SocketResult<int>&>().Value()));
+static_assert(noexcept(std::declval<SocketResult<int>&&>().Value()));
+static_assert(noexcept(std::declval<const SocketResult<int>&&>().Value()));
+static_assert(noexcept(std::declval<const SocketResult<int>&>().Error()));
+static_assert(noexcept(SocketResult<void>::Success()));
+static_assert(noexcept(SocketResult<void>::Failure(SocketError{ 1 })));
+static_assert(noexcept(std::declval<const SocketResult<void>&>().Value()));
+static_assert(noexcept(std::declval<const SocketResult<void>&>().Error()));
+
 TEST(SocketResult, ZeroBytesIsASuccessfulValue)
 {
     auto result = SocketResult<std::size_t>::Success(0);
@@ -30,26 +42,16 @@ TEST(SocketResult, ZeroBytesIsASuccessfulValue)
     EXPECT_EQ(copy.Value(), 12u);
 }
 
-TEST(SocketResult, FailurePreservesErrorAndCheckedAccessThrows)
+TEST(SocketResult, FailurePreservesErrorWithoutThrowing)
 {
     const SocketError error{ std::make_error_code(std::errc::connection_refused) };
     auto result = SocketResult<int>::Failure(error);
     EXPECT_FALSE(result);
     EXPECT_FALSE(result.HasValue());
     EXPECT_EQ(result.Error(), error);
-    try
-    {
-        (void)result.Value();
-        FAIL() << "Expected std::system_error";
-    }
-    catch (const std::system_error& exception)
-    {
-        EXPECT_EQ(exception.code(), error.ErrorCode());
-    }
     const auto copy = result;
-    EXPECT_THROW((void)copy.Value(), std::system_error);
-    EXPECT_THROW((void)std::move(result).Value(), std::system_error);
-    EXPECT_THROW((void)std::move(copy).Value(), std::system_error);
+    EXPECT_FALSE(copy);
+    EXPECT_EQ(copy.Error(), error);
 }
 
 TEST(SocketResult, MoveOnlyValueCanBeExtractedWithoutCopying)
@@ -83,19 +85,33 @@ TEST(SocketResult, VoidSupportsSuccessAndFailure)
     EXPECT_TRUE(result);
     EXPECT_TRUE(result.HasValue());
     EXPECT_TRUE(result.Error().IsSuccess());
-    EXPECT_NO_THROW(result.Value());
+    result.Value();
     const SocketError error{ std::make_error_code(std::errc::address_in_use) };
     result = SocketResult<void>::Failure(error);
     EXPECT_FALSE(result);
     EXPECT_FALSE(result.HasValue());
     EXPECT_EQ(result.Error(), error);
-    EXPECT_THROW(result.Value(), std::system_error);
 }
 
-TEST(SocketResult, RejectsFailureWithoutAnError)
+#if GTEST_HAS_DEATH_TEST && !defined(NDEBUG)
+TEST(SocketResult, InvalidUsageAsserts)
 {
-    EXPECT_THROW((void)SocketResult<int>::Failure(SocketError::Success()), std::invalid_argument);
-    EXPECT_THROW((void)SocketResult<void>::Failure(SocketError::Success()), std::invalid_argument);
+    EXPECT_DEATH((void)SocketResult<int>::Failure(SocketError::Success()), "nonzero error");
+    EXPECT_DEATH((void)SocketResult<void>::Failure(SocketError::Success()), "nonzero error");
+    const SocketError error{ std::make_error_code(std::errc::timed_out) };
+    const auto result = SocketResult<int>::Failure(error);
+    EXPECT_DEATH((void)result.Value(), "requires success");
+    const auto empty = SocketResult<void>::Failure(error);
+    EXPECT_DEATH(empty.Value(), "requires success");
+}
+#endif
+
+TEST(SocketResult, ConstAndRvalueAccessPreserveValues)
+{
+    const auto result = SocketResult<int>::Success(42);
+    EXPECT_EQ(result.Value(), 42);
+    EXPECT_EQ(std::move(result).Value(), 42);
+    EXPECT_EQ(SocketResult<int>::Success(7).Value(), 7);
 }
 
 TEST(SocketResult, ErrorCanAlsoBeUsedAsTheValueType)

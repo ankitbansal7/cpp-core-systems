@@ -2,7 +2,7 @@
 
 #include "net/socket_error.hpp"
 
-#include <stdexcept>
+#include <cassert>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -19,18 +19,15 @@ class [[nodiscard]] SocketResult final
 
 public:
     [[nodiscard]]
-    static SocketResult Success(T value)
+    static SocketResult Success(T value) noexcept(std::is_nothrow_move_constructible_v<T>)
     {
         return SocketResult{ std::in_place_index<0>, std::move(value) };
     }
 
     [[nodiscard]]
-    static SocketResult Failure(SocketError error)
+    static SocketResult Failure(SocketError error) noexcept
     {
-        if (!error)
-        {
-            throw std::invalid_argument("SocketResult::Failure requires a nonzero error");
-        }
+        assert(error.HasError() && "SocketResult::Failure requires a nonzero error");
         return SocketResult{ std::in_place_index<1>, error };
     }
 
@@ -46,59 +43,65 @@ public:
         return HasValue();
     }
 
-    // Checked access: throws std::system_error on failure.
+    // Precondition: HasValue(). Check the result before accessing its value.
+    // Invalid access asserts in debug builds and is undefined in release builds.
     [[nodiscard]]
-    T& Value() &
+    T& Value() & noexcept
     {
         CheckValue();
-        return std::get<0>(m_storage);
+        return *std::get_if<0>(&m_storage);
     }
 
     [[nodiscard]]
-    const T& Value() const &
+    const T& Value() const & noexcept
     {
         CheckValue();
-        return std::get<0>(m_storage);
+        return *std::get_if<0>(&m_storage);
     }
 
     [[nodiscard]]
-    T&& Value() &&
+    T&& Value() && noexcept
     {
         CheckValue();
-        return std::get<0>(std::move(m_storage));
+        return std::move(*std::get_if<0>(&m_storage));
     }
 
     [[nodiscard]]
-    const T&& Value() const &&
+    const T&& Value() const && noexcept
     {
         CheckValue();
-        return std::get<0>(std::move(m_storage));
+        return std::move(*std::get_if<0>(&m_storage));
     }
 
     // Returns a success error code when a value is present.
     [[nodiscard]]
-    SocketError Error() const
+    SocketError Error() const noexcept
     {
-        return HasValue() ? SocketError::Success() : std::get<1>(m_storage);
+        if (HasValue())
+        {
+            return SocketError::Success();
+        }
+        const auto* error = std::get_if<1>(&m_storage);
+        assert(error != nullptr && "SocketResult storage is valueless");
+        return *error;
     }
 
 private:
     template <std::size_t Index, typename U>
     SocketResult(std::in_place_index_t<Index> tag, U&& value)
+        noexcept(std::is_nothrow_constructible_v<std::variant<T, SocketError>,
+            std::in_place_index_t<Index>, U&&>)
         : m_storage(tag, std::forward<U>(value))
     {
     }
 
-    void CheckValue() const
+    void CheckValue() const noexcept
     {
-        if (!HasValue())
-        {
-            throw std::system_error(Error().ErrorCode());
-        }
+        assert(HasValue() && "SocketResult::Value requires success");
     }
 
-    // Copy/move support follows T. As with std::variant, a throwing T during
-    // assignment can leave storage valueless; access then throws bad_variant_access.
+    // Construction/copy/move inherit T's exception behavior. A throwing T during
+    // assignment can leave storage valueless; Value/Error must not then be used.
     std::variant<T, SocketError> m_storage;
 };
 
@@ -113,12 +116,9 @@ public:
     }
 
     [[nodiscard]]
-    static SocketResult Failure(SocketError error)
+    static SocketResult Failure(SocketError error) noexcept
     {
-        if (!error)
-        {
-            throw std::invalid_argument("SocketResult::Failure requires a nonzero error");
-        }
+        assert(error.HasError() && "SocketResult::Failure requires a nonzero error");
         return SocketResult{ error };
     }
 
@@ -134,12 +134,10 @@ public:
         return HasValue();
     }
 
-    void Value() const
+    // Precondition: HasValue(), as for the value-bearing specialization.
+    void Value() const noexcept
     {
-        if (m_error)
-        {
-            throw std::system_error(m_error.ErrorCode());
-        }
+        assert(HasValue() && "SocketResult::Value requires success");
     }
 
     [[nodiscard]]
