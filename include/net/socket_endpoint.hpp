@@ -174,7 +174,7 @@ public:
     [[nodiscard]]
     static std::optional<SocketEndpoint> FromNative(const sockaddr* addr, socklen_t len)
     {
-        if (addr == nullptr)
+        if (addr == nullptr || len < static_cast<socklen_t>(sizeof(sockaddr)))
         {
             return std::nullopt;
         }

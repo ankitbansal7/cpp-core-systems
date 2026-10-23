@@ -37,6 +37,28 @@ TEST(SocketEndpoint, NativeRoundTrip)
     }
 }
 
+TEST(SocketEndpoint, RejectsTruncatedNativeAddresses)
+{
+    EXPECT_FALSE(SocketEndpoint::FromNative(nullptr, 0));
+
+    // A family read from this buffer would overrun it under AddressSanitizer.
+    alignas(sockaddr) const std::array<std::uint8_t, 1> truncated{};
+    EXPECT_FALSE(SocketEndpoint::FromNative(
+        reinterpret_cast<const sockaddr*>(truncated.data()),
+        static_cast<socklen_t>(truncated.size())));
+
+    for (auto version : { IPVersion::IPv4, IPVersion::IPv6 })
+    {
+        const SocketEndpoint endpoint{ IPAddress::Loopback(version), 12345 };
+        const auto [storage, length] = endpoint.ToNative();
+        for (socklen_t len = 0; len < length; ++len)
+        {
+            EXPECT_FALSE(SocketEndpoint::FromNative(
+                reinterpret_cast<const sockaddr*>(&storage), len));
+        }
+    }
+}
+
 TEST(SocketEndpoint, PreservesIPv6Scope)
 {
     const auto address = IPAddress::Parse("fe80::1");
