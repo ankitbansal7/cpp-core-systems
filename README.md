@@ -51,3 +51,25 @@ Additional arguments go directly to CTest, for example:
 bash scripts/run-tests.sh -L net
 bash scripts/run-tests.sh -R SocketHandle
 ```
+
+## Running clang-tidy on Linux
+
+Install clang-tidy alongside the Linux build prerequisites:
+
+```bash
+sudo apt install clang-tidy
+bash scripts/run-clang-tidy.sh
+```
+
+The script generates a compile database in `out/build/linux-clang-tidy` and
+checks the library and example sources, including project headers they use.
+The minimal `.clang-tidy` configuration enables Clang static analyzer and
+bug-prone code checks. It reports diagnostics without modifying files.
+Headers that are not included by these sources are not analyzed.
+
+Additional arguments go directly to clang-tidy. To make enabled warnings fail
+the run:
+
+```bash
+bash scripts/run-clang-tidy.sh '--warnings-as-errors=*'
+```
