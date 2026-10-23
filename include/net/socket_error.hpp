@@ -52,38 +52,38 @@ public:
     [[nodiscard]]
     bool IsWouldBlock() const noexcept
     {
-        return (m_ec == std::errc::operation_would_block) ||
-            (m_ec == std::errc::resource_unavailable_try_again);
+        return Matches(std::errc::operation_would_block) ||
+            Matches(std::errc::resource_unavailable_try_again);
     }
 
     [[nodiscard]]
     bool IsInterrupted() const noexcept
     {
-        return (m_ec == std::errc::interrupted);
+        return Matches(std::errc::interrupted);
     }
 
     [[nodiscard]]
     bool IsConnectionReset() const noexcept
     {
-        return (m_ec == std::errc::connection_reset);
+        return Matches(std::errc::connection_reset);
     }
 
     [[nodiscard]]
     bool IsConnectionRefused() const noexcept
     {
-        return (m_ec == std::errc::connection_refused);
+        return Matches(std::errc::connection_refused);
     }
 
     [[nodiscard]]
     bool IsTimedOut() const noexcept
     {
-        return (m_ec == std::errc::timed_out);
+        return Matches(std::errc::timed_out);
     }
 
     [[nodiscard]]
     bool IsAddressInUse() const noexcept
     {
-        return (m_ec == std::errc::address_in_use);
+        return Matches(std::errc::address_in_use);
     }
 
     // Temporary network issues where retrying immediately or after a delay makes sense
@@ -96,7 +96,7 @@ public:
     [[nodiscard]]
     bool IsConnectionAborted() const noexcept
     {
-        return (m_ec == std::errc::connection_aborted);
+        return Matches(std::errc::connection_aborted);
     }
 
     [[nodiscard]]
@@ -104,8 +104,8 @@ public:
     {
         return IsConnectionReset() ||
             IsConnectionAborted() ||
-            (m_ec == std::errc::broken_pipe) ||
-            (m_ec == std::errc::not_connected);
+            Matches(std::errc::broken_pipe) ||
+            Matches(std::errc::not_connected);
     }
 
     [[nodiscard]]
@@ -157,7 +157,7 @@ public:
     [[nodiscard]]
     friend bool operator==(const SocketError& lhs, std::errc rhs) noexcept
     {
-        return lhs.m_ec == rhs;
+        return lhs.Matches(rhs);
     }
 
     [[nodiscard]]
@@ -198,6 +198,41 @@ public:
     }
 
 private:
+    [[nodiscard]]
+    bool Matches(std::errc condition) const noexcept
+    {
+#ifdef _WIN32
+        // MinGW does not consistently map Winsock system errors to std::errc.
+        // Keep native codes intact and normalize only condition comparisons.
+        if (m_ec.category() == std::system_category())
+        {
+            switch (m_ec.value())
+            {
+            case WSAEWOULDBLOCK:
+                return condition == std::errc::operation_would_block ||
+                    condition == std::errc::resource_unavailable_try_again;
+            case WSAEINTR:
+                return condition == std::errc::interrupted;
+            case WSAECONNRESET:
+                return condition == std::errc::connection_reset;
+            case WSAECONNREFUSED:
+                return condition == std::errc::connection_refused;
+            case WSAETIMEDOUT:
+                return condition == std::errc::timed_out;
+            case WSAEADDRINUSE:
+                return condition == std::errc::address_in_use;
+            case WSAECONNABORTED:
+                return condition == std::errc::connection_aborted;
+            case WSAENOTCONN:
+                return condition == std::errc::not_connected;
+            default:
+                break;
+            }
+        }
+#endif
+        return m_ec == condition;
+    }
+
     std::error_code m_ec{};
 };
 

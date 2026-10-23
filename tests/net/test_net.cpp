@@ -1,4 +1,5 @@
 #include "net/socket_endpoint.hpp"
+#include "net/socket_error.hpp"
 #include <gtest/gtest.h>
 
 TEST(IPAddress, RejectsEmbeddedNuls)
@@ -74,3 +75,68 @@ TEST(SocketEndpoint, PreservesIPv6Scope)
     EXPECT_NE(original, (SocketEndpoint{ *address, 8080, 8 }));
     EXPECT_EQ((SocketEndpoint{ IPAddress::Loopback(IPVersion::IPv4), 80, 7 }).GetScopeId(), 0u);
 }
+
+TEST(SocketError, ClassifiesGenericConditions)
+{
+    EXPECT_TRUE(SocketError{ std::make_error_code(std::errc::operation_would_block) }.IsWouldBlock());
+    EXPECT_TRUE(SocketError{ std::make_error_code(std::errc::interrupted) }.IsInterrupted());
+    EXPECT_TRUE(SocketError{ std::make_error_code(std::errc::connection_reset) }.IsDisconnected());
+    EXPECT_TRUE(SocketError{ std::make_error_code(std::errc::connection_refused) }.IsConnectionRefused());
+    EXPECT_TRUE(SocketError{ std::make_error_code(std::errc::timed_out) }.IsTransient());
+    EXPECT_TRUE(SocketError{ std::make_error_code(std::errc::address_in_use) }.IsAddressInUse());
+    EXPECT_TRUE(SocketError{ std::make_error_code(std::errc::connection_aborted) }.IsDisconnected());
+    EXPECT_TRUE(SocketError{ std::make_error_code(std::errc::broken_pipe) }.IsDisconnected());
+    EXPECT_TRUE(SocketError{ std::make_error_code(std::errc::not_connected) }.IsDisconnected());
+    EXPECT_FALSE(SocketError::Success().IsTransient());
+    EXPECT_FALSE(SocketError::Success().IsDisconnected());
+}
+
+#ifdef _WIN32
+TEST(SocketError, ClassifiesWinsockErrors)
+{
+    const std::pair<int, std::errc> cases[]{
+        { WSAEWOULDBLOCK, std::errc::operation_would_block },
+        { WSAEWOULDBLOCK, std::errc::resource_unavailable_try_again },
+        { WSAEINTR, std::errc::interrupted },
+        { WSAECONNRESET, std::errc::connection_reset },
+        { WSAECONNREFUSED, std::errc::connection_refused },
+        { WSAETIMEDOUT, std::errc::timed_out },
+        { WSAEADDRINUSE, std::errc::address_in_use },
+        { WSAECONNABORTED, std::errc::connection_aborted },
+        { WSAENOTCONN, std::errc::not_connected },
+    };
+
+    for (const auto& [code, condition] : cases)
+    {
+        const SocketError error{ code };
+        EXPECT_EQ(error, condition);
+        EXPECT_FALSE(error != condition);
+        EXPECT_NE(error, std::errc::invalid_argument);
+        EXPECT_EQ(error.Code(), code);
+        EXPECT_EQ(error.ErrorCode(), std::error_code(code, std::system_category()));
+        // Identical numbers from other categories must not be treated as Winsock errors.
+        EXPECT_NE((SocketError{ std::error_code(code, std::generic_category()) }), condition);
+    }
+
+    EXPECT_TRUE(SocketError{ WSAEWOULDBLOCK }.IsWouldBlock());
+    EXPECT_TRUE(SocketError{ WSAEINTR }.IsInterrupted());
+    EXPECT_TRUE(SocketError{ WSAECONNRESET }.IsConnectionReset());
+    EXPECT_TRUE(SocketError{ WSAECONNREFUSED }.IsConnectionRefused());
+    EXPECT_TRUE(SocketError{ WSAETIMEDOUT }.IsTimedOut());
+    EXPECT_TRUE(SocketError{ WSAEADDRINUSE }.IsAddressInUse());
+    EXPECT_TRUE(SocketError{ WSAECONNABORTED }.IsConnectionAborted());
+    EXPECT_TRUE(SocketError{ WSAEWOULDBLOCK }.IsTransient());
+    EXPECT_TRUE(SocketError{ WSAEINTR }.IsTransient());
+    EXPECT_TRUE(SocketError{ WSAETIMEDOUT }.IsTransient());
+    EXPECT_TRUE(SocketError{ WSAECONNRESET }.IsDisconnected());
+    EXPECT_TRUE(SocketError{ WSAECONNABORTED }.IsDisconnected());
+    EXPECT_TRUE(SocketError{ WSAENOTCONN }.IsDisconnected());
+    EXPECT_FALSE(SocketError{ WSAEINVAL }.IsWouldBlock());
+    EXPECT_FALSE(SocketError{ WSAECONNREFUSED }.IsTransient());
+    EXPECT_FALSE(SocketError{ WSAEWOULDBLOCK }.IsDisconnected());
+
+    ::WSASetLastError(WSAEWOULDBLOCK);
+    EXPECT_TRUE(SocketError::Last().IsWouldBlock());
+    ::WSASetLastError(0);
+}
+#endif
