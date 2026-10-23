@@ -5,6 +5,7 @@ add_executable(test_net
   test_socket_handle.cpp
   test_socket_runtime.cpp
   test_socket_result.cpp
+  test_tcp_socket.cpp
 )
 target_link_libraries(test_net PRIVATE cpp_core_systems::cpp_core_systems GTest::gtest_main)
-gtest_discover_tests(test_net PROPERTIES LABELS "net")
+gtest_discover_tests(test_net PROPERTIES LABELS "net" TIMEOUT 15)
