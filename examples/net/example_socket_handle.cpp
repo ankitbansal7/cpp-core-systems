@@ -6,6 +6,7 @@
 #include <utility>
 #include <unordered_set>
 
+#include "net/socket_runtime.hpp"
 #include "net/socket_handle.hpp"
 #include "net/socket_error.hpp"
 #include "net/ip_address.hpp"
@@ -16,39 +17,6 @@
 
 namespace
 {
-    // Winsock refuses to hand out sockets until the library is initialised,
-    // and expects a matching cleanup. Scoping that in a small RAII type keeps
-    // main() free of platform noise; on POSIX it does nothing at all.
-    class NetworkStartup
-    {
-    public:
-        NetworkStartup()
-        {
-#ifdef _WIN32
-            WSADATA data{};
-            int result = ::WSAStartup(MAKEWORD(2, 2), &data);
-
-            if (result != 0)
-            {
-                // WSAStartup returns the error directly rather than setting
-                // the last-error slot, so report the returned code.
-                std::cerr << "WSAStartup failed: "
-                    << SocketError{ result }.Message() << '\n';
-            }
-#endif
-        }
-
-        ~NetworkStartup()
-        {
-#ifdef _WIN32
-            ::WSACleanup();
-#endif
-        }
-
-        NetworkStartup(const NetworkStartup&) = delete;
-        NetworkStartup& operator=(const NetworkStartup&) = delete;
-    };
-
     // Creates a plain TCP socket, or an invalid handle if the call fails.
     SocketHandle MakeTcpSocket()
     {
@@ -71,7 +39,14 @@ namespace
 
 int main()
 {
-    NetworkStartup startup;
+    SocketRuntime runtime;
+
+    if (!runtime)
+    {
+        std::cerr << "SocketRuntime initialization failed: "
+            << runtime.GetError().Message() << '\n';
+        return runtime.GetError().Code();
+    }
 
     // A default-constructed handle owns nothing and is safe to destroy.
     SocketHandle empty;

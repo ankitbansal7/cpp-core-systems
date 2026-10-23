@@ -6,6 +6,8 @@
 #include <utility>
 #include <cstdio>
 #include <cstdint>
+#include <functional>
+#include <compare>
 
 class SocketHandle final
 {
@@ -26,7 +28,7 @@ public:
     {
     }
 
-    ~SocketHandle()
+    ~SocketHandle() noexcept
     {
         Close();
     }
@@ -48,6 +50,12 @@ public:
         }
 
         return *this;
+    }
+
+    [[nodiscard]]
+    static SocketHandle Invalid() noexcept
+    {
+        return SocketHandle{};
     }
 
     [[nodiscard]]
@@ -101,11 +109,23 @@ public:
 #ifndef NDEBUG
         if (result != 0)
         {
-            SocketError error = SocketError::Last();
-            std::fprintf(stderr,
-                "SocketHandle::Close failed (handle=%llu): %s\n",
-                static_cast<unsigned long long>(handleToClose),
-                error.Message().c_str());
+            const SocketError error = SocketError::Last();
+
+            try
+            {
+                std::fprintf(stderr,
+                    "SocketHandle::Close failed (handle=%llu): %s (code=%d)\n",
+                    static_cast<unsigned long long>(handleToClose),
+                    error.Message().c_str(),
+                    error.Code());
+            }
+            catch (...)
+            {
+                std::fprintf(stderr,
+                    "SocketHandle::Close failed (handle=%llu, code=%d)\n",
+                    static_cast<unsigned long long>(handleToClose),
+                    error.Code());
+            }
         }
 #endif
     }
@@ -121,7 +141,32 @@ public:
         a.Swap(b);
     }
 
+    // --- Relational Operators ---
+
+    [[nodiscard]]
+    friend bool operator==(const SocketHandle& lhs, const SocketHandle& rhs) noexcept
+    {
+        return lhs.m_handle == rhs.m_handle;
+    }
+
+    [[nodiscard]]
+    friend auto operator<=>(const SocketHandle& lhs, const SocketHandle& rhs) noexcept
+    {
+        return lhs.m_handle <=> rhs.m_handle;
+    }
+
 private:
     NativeHandle m_handle{ InvalidHandle };
 };
 
+namespace std
+{
+    template <>
+    struct hash<SocketHandle>
+    {
+        std::size_t operator()(const SocketHandle& handle) const noexcept
+        {
+            return std::hash<SocketHandle::NativeHandle>{}(handle.Get());
+        }
+    };
+}

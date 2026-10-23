@@ -12,6 +12,7 @@
 #include <cstring>
 #include <functional>
 #include <span>
+#include <compare>
 
 enum class IPVersion
 {
@@ -21,9 +22,9 @@ enum class IPVersion
 
 /// Represents an IPv4 or IPv6 address.
 ///
-/// IPAddress supports equality comparison and can be used directly
-/// as a key in standard unordered containers such as
-/// std::unordered_map and std::unordered_set.
+/// IPAddress supports equality, three-way comparison (<=>), and hashing,
+/// so it can be used directly in std::map, std::set, std::unordered_map,
+/// and std::unordered_set.
 class IPAddress final
 {
 private:
@@ -52,18 +53,27 @@ public:
     }
 
     [[nodiscard]]
-    static std::optional<IPAddress> Parse(std::string_view address)
+    static std::optional<IPAddress> Parse(std::string_view address) noexcept
     {
+        if (address.empty() || address.size() >= INET6_ADDRSTRLEN)
+        {
+            return std::nullopt;
+        }
+
         if (address.find('\0') != std::string_view::npos)
         {
             return std::nullopt;
         }
 
-        std::string addressStr(address);
+        // Stack buffer avoids heap allocation
+        char buffer[INET6_ADDRSTRLEN]{ 0 };
+        std::memcpy(buffer, address.data(), address.size());
+        buffer[address.size()] = '\0';
+
         IPAddress result;
         in_addr ipv4{};
 
-        if (::inet_pton(AF_INET, addressStr.c_str(), &ipv4) == 1)
+        if (::inet_pton(AF_INET, buffer, &ipv4) == 1)
         {
             result.m_version = IPVersion::IPv4;
             std::memcpy(result.m_bytes.data(), &ipv4, sizeof(ipv4));
@@ -72,7 +82,7 @@ public:
 
         in6_addr ipv6{};
 
-        if (::inet_pton(AF_INET6, addressStr.c_str(), &ipv6) == 1)
+        if (::inet_pton(AF_INET6, buffer, &ipv6) == 1)
         {
             result.m_version = IPVersion::IPv6;
             std::memcpy(result.m_bytes.data(), &ipv6, sizeof(ipv6));
@@ -86,17 +96,16 @@ public:
     static IPAddress Loopback(IPVersion version) noexcept
     {
         IPAddress address;
-        address.m_version = version;
 
         if (version == IPVersion::IPv4)
         {
-            // 127.0.0.1
+            address.m_version = IPVersion::IPv4;
             address.m_bytes[0] = 127;
             address.m_bytes[3] = 1;
         }
         else
         {
-            // ::1
+            address.m_version = IPVersion::IPv6;
             address.m_bytes[15] = 1;
         }
 
@@ -107,7 +116,7 @@ public:
     static IPAddress Any(IPVersion version) noexcept
     {
         IPAddress address;
-        address.m_version = version;
+        address.m_version = (version == IPVersion::IPv4) ? IPVersion::IPv4 : IPVersion::IPv6;
         return address;
     }
 
@@ -117,11 +126,18 @@ public:
         return m_version;
     }
 
-    // Raw pointer overload for C-style APIs (inet_ntop, sockaddr population)
+    /// Raw pointer overload for C-style APIs (inet_ntop, sockaddr population).
     [[nodiscard]]
     const std::uint8_t* Bytes() const noexcept
     {
         return m_bytes.data();
+    }
+
+    /// Safe span accessor sized to the valid byte count (4 or 16).
+    [[nodiscard]]
+    std::span<const std::uint8_t> SpanBytes() const noexcept
+    {
+        return { m_bytes.data(), ByteCount() };
     }
 
     [[nodiscard]]
@@ -134,7 +150,7 @@ public:
     std::string ToString() const
     {
         char buffer[INET6_ADDRSTRLEN]{};
-        int family = (m_version == IPVersion::IPv4) ? AF_INET : AF_INET6;
+        const int family = (m_version == IPVersion::IPv4) ? AF_INET : AF_INET6;
 
         if (::inet_ntop(family, m_bytes.data(), buffer, sizeof(buffer)) == nullptr)
         {
@@ -143,6 +159,8 @@ public:
 
         return std::string{ buffer };
     }
+
+    // --- Relational Operators ---
 
     [[nodiscard]]
     bool operator==(const IPAddress& other) const noexcept
@@ -156,9 +174,16 @@ public:
     }
 
     [[nodiscard]]
-    bool operator!=(const IPAddress& other) const noexcept
+    friend std::strong_ordering operator<=>(const IPAddress& lhs, const IPAddress& rhs) noexcept
     {
-        return !(*this == other);
+        if (auto cmp = lhs.m_version <=> rhs.m_version; cmp != 0)
+        {
+            return cmp;
+        }
+
+        return std::lexicographical_compare_three_way(
+            lhs.m_bytes.begin(), lhs.m_bytes.begin() + lhs.ByteCount(),
+            rhs.m_bytes.begin(), rhs.m_bytes.begin() + rhs.ByteCount());
     }
 
     [[nodiscard]]
@@ -193,7 +218,6 @@ private:
 
 namespace std
 {
-
     template <>
     struct hash<IPAddress>
     {
@@ -202,6 +226,4 @@ namespace std
             return address.Hash();
         }
     };
-
 }
-

@@ -20,7 +20,8 @@ public:
             return;
         }
 
-        if (data.wVersion != MAKEWORD(2, 2))
+        // Canonical Winsock 2.2 version check recommended by Microsoft:
+        if (LOBYTE(data.wVersion) != 2 || HIBYTE(data.wVersion) != 2)
         {
             ::WSACleanup();
             m_error = SocketError{ WSAVERNOTSUPPORTED };

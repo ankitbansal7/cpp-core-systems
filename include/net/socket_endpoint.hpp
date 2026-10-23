@@ -5,10 +5,13 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <optional>
 #include <cstring>
 #include <array>
 #include <utility>
+#include <compare>
+#include <charconv>
 
 class SocketEndpoint final
 {
@@ -58,49 +61,116 @@ public:
         return m_address.ToString() + ":" + std::to_string(m_port);
     }
 
+    [[nodiscard]]
+    static std::optional<SocketEndpoint> Parse(std::string_view str) noexcept
+    {
+        if (str.empty())
+        {
+            return std::nullopt;
+        }
+
+        if (str.front() == '[')
+        {
+            const auto closeBracket = str.find(']');
+
+            if (closeBracket == std::string_view::npos || closeBracket + 1 >= str.size() || str[closeBracket + 1] != ':')
+            {
+                return std::nullopt;
+            }
+
+            std::string_view ipPart = str.substr(1, closeBracket - 1);
+            std::string_view portPart = str.substr(closeBracket + 2);
+
+            std::uint32_t scopeId = 0;
+            const auto percent = ipPart.find('%');
+
+            if (percent != std::string_view::npos)
+            {
+                std::string_view scopePart = ipPart.substr(percent + 1);
+                ipPart = ipPart.substr(0, percent);
+
+                auto [ptr, ec] = std::from_chars(scopePart.data(), scopePart.data() + scopePart.size(), scopeId);
+
+                if (ec != std::errc{} || ptr != scopePart.data() + scopePart.size())
+                {
+                    return std::nullopt;
+                }
+            }
+
+            auto ip = IPAddress::Parse(ipPart);
+
+            if (!ip || ip->GetVersion() != IPVersion::IPv6)
+            {
+                return std::nullopt;
+            }
+
+            std::uint16_t port = 0;
+            auto [ptr, ec] = std::from_chars(portPart.data(), portPart.data() + portPart.size(), port);
+
+            if (ec != std::errc{} || ptr != portPart.data() + portPart.size())
+            {
+                return std::nullopt;
+            }
+
+            return SocketEndpoint{ *ip, port, scopeId };
+        }
+
+        const auto colon = str.rfind(':');
+
+        if (colon == std::string_view::npos || colon == 0 || colon + 1 >= str.size())
+        {
+            return std::nullopt;
+        }
+
+        std::string_view ipPart = str.substr(0, colon);
+        std::string_view portPart = str.substr(colon + 1);
+
+        auto ip = IPAddress::Parse(ipPart);
+
+        if (!ip || ip->GetVersion() != IPVersion::IPv4)
+        {
+            return std::nullopt;
+        }
+
+        std::uint16_t port = 0;
+        auto [ptr, ec] = std::from_chars(portPart.data(), portPart.data() + portPart.size(), port);
+
+        if (ec != std::errc{} || ptr != portPart.data() + portPart.size())
+        {
+            return std::nullopt;
+        }
+
+        return SocketEndpoint{ *ip, port };
+    }
+
     // --- OS Interop Helpers ---
 
-    // Populates a native sockaddr_storage and returns its byte size
     [[nodiscard]]
     std::pair<sockaddr_storage, socklen_t> ToNative() const noexcept
     {
         sockaddr_storage storage{};
-        socklen_t length = 0;
 
         if (m_address.GetVersion() == IPVersion::IPv4)
         {
-            auto* addr4 = reinterpret_cast<sockaddr_in*>(&storage);
-
-            if (addr4 == nullptr)
-            {
-                return { storage, length };
-            }
-
-            addr4->sin_family = AF_INET;
-            addr4->sin_port = htons(m_port);
-            std::memcpy(&addr4->sin_addr, m_address.Bytes(), IPAddress::IPV4_BYTE_COUNT);
-            length = sizeof(sockaddr_in);
+            sockaddr_in addr4{};
+            addr4.sin_family = AF_INET;
+            addr4.sin_port = htons(m_port);
+            std::memcpy(&addr4.sin_addr, m_address.Bytes(), IPAddress::IPV4_BYTE_COUNT);
+            std::memcpy(&storage, &addr4, sizeof(addr4));
+            return { storage, static_cast<socklen_t>(sizeof(sockaddr_in)) };
         }
         else
         {
-            auto* addr6 = reinterpret_cast<sockaddr_in6*>(&storage);
-
-            if (addr6 == nullptr)
-            {
-                return { storage, length };
-            }
-
-            addr6->sin6_family = AF_INET6;
-            addr6->sin6_port = htons(m_port);
-            addr6->sin6_scope_id = m_scopeId;
-            std::memcpy(&addr6->sin6_addr, m_address.Bytes(), IPAddress::IPV6_BYTE_COUNT);
-            length = sizeof(sockaddr_in6);
+            sockaddr_in6 addr6{};
+            addr6.sin6_family = AF_INET6;
+            addr6.sin6_port = htons(m_port);
+            addr6.sin6_scope_id = m_scopeId;
+            std::memcpy(&addr6.sin6_addr, m_address.Bytes(), IPAddress::IPV6_BYTE_COUNT);
+            std::memcpy(&storage, &addr6, sizeof(addr6));
+            return { storage, static_cast<socklen_t>(sizeof(sockaddr_in6)) };
         }
-
-        return { storage, length };
     }
 
-    // Constructs a SocketEndpoint from an OS sockaddr_storage (e.g., from accept() or getpeername())
     [[nodiscard]]
     static std::optional<SocketEndpoint> FromNative(const sockaddr* addr, socklen_t len)
     {
@@ -111,52 +181,71 @@ public:
 
         if ((addr->sa_family == AF_INET) && (len >= static_cast<socklen_t>(sizeof(sockaddr_in))))
         {
-            const auto* addr4 = reinterpret_cast<const sockaddr_in*>(addr);
-
-            if (addr4 == nullptr)
-            {
-                return std::nullopt;
-            }
+            sockaddr_in addr4{};
+            std::memcpy(&addr4, addr, sizeof(addr4));
 
             std::array<std::uint8_t, IPAddress::IPV4_BYTE_COUNT> bytes{};
-            std::memcpy(bytes.data(), &addr4->sin_addr, bytes.size());
+            std::memcpy(bytes.data(), &addr4.sin_addr, bytes.size());
 
             if (auto ip = IPAddress::FromBytes(bytes, IPVersion::IPv4))
             {
-                return SocketEndpoint{ *ip, ntohs(addr4->sin_port) };
+                return SocketEndpoint{ *ip, ntohs(addr4.sin_port) };
             }
         }
         else if (addr->sa_family == AF_INET6 && len >= static_cast<socklen_t>(sizeof(sockaddr_in6)))
         {
-            const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(addr);
-
-            if (addr6 == nullptr)
-            {
-                return std::nullopt;
-            }
+            sockaddr_in6 addr6{};
+            std::memcpy(&addr6, addr, sizeof(addr6));
 
             std::array<std::uint8_t, IPAddress::IPV6_BYTE_COUNT> bytes{};
-            std::memcpy(bytes.data(), &addr6->sin6_addr, bytes.size());
+            std::memcpy(bytes.data(), &addr6.sin6_addr, bytes.size());
 
             if (auto ip = IPAddress::FromBytes(bytes, IPVersion::IPv6))
             {
-                return SocketEndpoint{ *ip, ntohs(addr6->sin6_port), addr6->sin6_scope_id };
+                return SocketEndpoint{ *ip, ntohs(addr6.sin6_port), addr6.sin6_scope_id };
             }
         }
 
         return std::nullopt;
     }
 
+    // --- Relational Operators ---
+
     [[nodiscard]]
-    bool operator==(const SocketEndpoint& other) const noexcept
+    friend bool operator==(const SocketEndpoint& lhs, const SocketEndpoint& rhs) noexcept
     {
-        return (m_address == other.m_address) && (m_port == other.m_port) && (m_scopeId == other.m_scopeId);
+        return (lhs.m_address == rhs.m_address) && (lhs.m_port == rhs.m_port) && (lhs.m_scopeId == rhs.m_scopeId);
     }
 
     [[nodiscard]]
-    bool operator!=(const SocketEndpoint& other) const noexcept
+    friend auto operator<=>(const SocketEndpoint& lhs, const SocketEndpoint& rhs) noexcept
     {
-        return !(*this == other);
+        if (auto cmp = lhs.m_address <=> rhs.m_address; cmp != 0)
+        {
+            return cmp;
+        }
+        if (auto cmp = lhs.m_port <=> rhs.m_port; cmp != 0)
+        {
+            return cmp;
+        }
+        return lhs.m_scopeId <=> rhs.m_scopeId;
+    }
+
+    // --- Hashing ---
+
+    [[nodiscard]]
+    std::size_t Hash() const noexcept
+    {
+        constexpr std::size_t prime = (sizeof(std::size_t) == 8) ? 1099511628211ull : 16777619u;
+        std::size_t hash = m_address.Hash();
+
+        hash ^= static_cast<std::size_t>(m_port);
+        hash *= prime;
+
+        hash ^= static_cast<std::size_t>(m_scopeId);
+        hash *= prime;
+
+        return hash;
     }
 
 private:
@@ -165,3 +254,14 @@ private:
     std::uint32_t m_scopeId{ 0 };
 };
 
+namespace std
+{
+    template <>
+    struct hash<SocketEndpoint>
+    {
+        std::size_t operator()(const SocketEndpoint& endpoint) const noexcept
+        {
+            return endpoint.Hash();
+        }
+    };
+}

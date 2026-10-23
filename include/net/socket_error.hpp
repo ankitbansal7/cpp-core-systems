@@ -2,6 +2,7 @@
 
 #include <string>
 #include <system_error>
+#include <ostream>
 
 #include "net/platform.hpp"
 
@@ -20,6 +21,12 @@ public:
     explicit SocketError(std::error_code ec) noexcept
         : m_ec(ec)
     {
+    }
+
+    [[nodiscard]]
+    static SocketError Success() noexcept
+    {
+        return SocketError{};
     }
 
     [[nodiscard]]
@@ -42,8 +49,6 @@ public:
         return m_ec.message();
     }
 
-    // Checking against std::errc allows cross-platform comparison,
-    // as std::system_category maps WSAE* and errno codes to generic std::errc conditions.
     [[nodiscard]]
     bool IsWouldBlock() const noexcept
     {
@@ -88,11 +93,19 @@ public:
         return (IsWouldBlock() || IsInterrupted() || IsTimedOut());
     }
 
-    // Disconnections that signal the peer is gone
+    [[nodiscard]]
+    bool IsConnectionAborted() const noexcept
+    {
+        return (m_ec == std::errc::connection_aborted);
+    }
+
     [[nodiscard]]
     bool IsDisconnected() const noexcept
     {
-        return IsConnectionReset() || (m_ec == std::errc::broken_pipe);
+        return IsConnectionReset() ||
+            IsConnectionAborted() ||
+            (m_ec == std::errc::broken_pipe) ||
+            (m_ec == std::errc::not_connected);
     }
 
     [[nodiscard]]
@@ -105,10 +118,26 @@ public:
 #endif
     }
 
-    // Implicit conversion to bool for checking success/failure
-    explicit operator bool() const noexcept
+    // Returns true if an error is present (non-zero error code).
+    [[nodiscard]]
+    bool HasError() const noexcept
     {
         return static_cast<bool>(m_ec);
+    }
+
+    /// Returns true if the operation completed with no error (code 0).
+    [[nodiscard]]
+    bool IsSuccess() const noexcept
+    {
+        return !m_ec;
+    }
+
+    // Explicit conversion to bool matching std::error_code semantics:
+    // true = ERROR, false = SUCCESS (no error).
+    [[nodiscard]]
+    explicit operator bool() const noexcept
+    {
+        return HasError();
     }
 
     // --- SocketError vs. SocketError ---
@@ -161,6 +190,11 @@ public:
     friend bool operator!=(const SocketError& lhs, std::error_code rhs) noexcept
     {
         return !(lhs == rhs);
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const SocketError& error)
+    {
+        return os << error.Message() << " (" << error.Code() << ")";
     }
 
 private:
