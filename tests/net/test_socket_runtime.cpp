@@ -3,6 +3,8 @@
 #include <gtest/gtest.h>
 #include <type_traits>
 
+using namespace net;
+
 static_assert(!std::is_copy_constructible_v<SocketRuntime>);
 static_assert(!std::is_copy_assignable_v<SocketRuntime>);
 static_assert(!std::is_move_constructible_v<SocketRuntime>);

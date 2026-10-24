@@ -10,6 +10,8 @@
 #include <string_view>
 #include <utility>
 
+using namespace net;
+
 namespace
 {
     SocketResult<void> SendAll(TcpSocket& socket, std::span<const std::byte> bytes) noexcept

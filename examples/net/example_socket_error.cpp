@@ -6,6 +6,8 @@
 #include <iostream>
 #include <system_error>
 
+using namespace net;
+
 int main()
 {
     SocketRuntime runtime;

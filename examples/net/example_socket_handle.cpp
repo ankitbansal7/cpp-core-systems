@@ -8,6 +8,8 @@
 #include "net/socket_handle.hpp"
 #include "net/socket_error.hpp"
 
+using namespace net;
+
 namespace
 {
     // Creates a plain TCP socket, or an invalid handle if the call fails.

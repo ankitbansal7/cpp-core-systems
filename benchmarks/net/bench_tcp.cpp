@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+using namespace net;
+
 namespace
 {
     using Clock = std::chrono::steady_clock;

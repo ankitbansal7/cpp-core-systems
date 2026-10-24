@@ -9,7 +9,7 @@
 
 namespace socket_test
 {
-    inline bool SetTimeouts(SocketHandle::NativeHandle handle)
+    inline bool SetTimeouts(net::SocketHandle::NativeHandle handle)
     {
 #ifdef _WIN32
         const DWORD timeout = 2000;
@@ -22,7 +22,7 @@ namespace socket_test
             ::setsockopt(handle, SOL_SOCKET, SO_SNDTIMEO, value, sizeof(timeout)) == 0;
     }
 
-    inline bool IsReadable(SocketHandle::NativeHandle handle)
+    inline bool IsReadable(net::SocketHandle::NativeHandle handle)
     {
         fd_set readSet;
         FD_ZERO(&readSet);

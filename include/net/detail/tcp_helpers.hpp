@@ -2,7 +2,7 @@
 
 #include "net/detail/socket_helpers.hpp"
 
-namespace net_detail
+namespace net::detail
 {
     // Linux uses MSG_NOSIGNAL in Send. BSD/macOS use this per-socket option.
     inline SocketResult<void> ConfigureTcpSocket(SocketHandle::NativeHandle handle) noexcept

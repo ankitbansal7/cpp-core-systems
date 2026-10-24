@@ -4,7 +4,7 @@
 #include "net/socket_handle.hpp"
 #include "net/socket_result.hpp"
 
-namespace net_detail
+namespace net::detail
 {
     inline SocketError InvalidSocket() noexcept
     {

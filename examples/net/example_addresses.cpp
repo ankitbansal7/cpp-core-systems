@@ -9,6 +9,8 @@
 #include <iostream>
 #include <unordered_set>
 
+using namespace net;
+
 int main()
 {
     SocketRuntime runtime;

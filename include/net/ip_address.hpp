@@ -14,214 +14,217 @@
 #include <span>
 #include <compare>
 
-enum class IPVersion
+namespace net
 {
-    IPv4,
-    IPv6
-};
-
-/// Represents an IPv4 or IPv6 address.
-///
-/// IPAddress supports equality, three-way comparison (<=>), and hashing,
-/// so it can be used directly in std::map, std::set, std::unordered_map,
-/// and std::unordered_set.
-class IPAddress final
-{
-private:
-    IPAddress() = default;
-
-public:
-    [[nodiscard]]
-    static std::optional<IPAddress> FromBytes(std::span<const std::uint8_t> bytes, IPVersion version) noexcept
+    enum class IPVersion
     {
-        if (version != IPVersion::IPv4 && version != IPVersion::IPv6)
+        IPv4,
+        IPv6
+    };
+
+    /// Represents an IPv4 or IPv6 address.
+    ///
+    /// IPAddress supports equality, three-way comparison (<=>), and hashing,
+    /// so it can be used directly in std::map, std::set, std::unordered_map,
+    /// and std::unordered_set.
+    class IPAddress final
+    {
+    private:
+        IPAddress() = default;
+
+    public:
+        [[nodiscard]]
+        static std::optional<IPAddress> FromBytes(std::span<const std::uint8_t> bytes, IPVersion version) noexcept
         {
+            if (version != IPVersion::IPv4 && version != IPVersion::IPv6)
+            {
+                return std::nullopt;
+            }
+
+            const std::size_t expected = (version == IPVersion::IPv4) ? IPV4_BYTE_COUNT : IPV6_BYTE_COUNT;
+
+            if (bytes.size() != expected)
+            {
+                return std::nullopt;
+            }
+
+            IPAddress address;
+            address.m_version = version;
+            std::copy(bytes.begin(), bytes.end(), address.m_bytes.begin());
+            return address;
+        }
+
+        [[nodiscard]]
+        static std::optional<IPAddress> Parse(std::string_view address) noexcept
+        {
+            if (address.empty() || address.size() >= INET6_ADDRSTRLEN)
+            {
+                return std::nullopt;
+            }
+
+            if (address.find('\0') != std::string_view::npos)
+            {
+                return std::nullopt;
+            }
+
+            // Stack buffer avoids heap allocation
+            char buffer[INET6_ADDRSTRLEN]{ 0 };
+            std::memcpy(buffer, address.data(), address.size());
+            buffer[address.size()] = '\0';
+
+            IPAddress result;
+            in_addr ipv4{};
+
+            if (::inet_pton(AF_INET, buffer, &ipv4) == 1)
+            {
+                result.m_version = IPVersion::IPv4;
+                std::memcpy(result.m_bytes.data(), &ipv4, sizeof(ipv4));
+                return result;
+            }
+
+            in6_addr ipv6{};
+
+            if (::inet_pton(AF_INET6, buffer, &ipv6) == 1)
+            {
+                result.m_version = IPVersion::IPv6;
+                std::memcpy(result.m_bytes.data(), &ipv6, sizeof(ipv6));
+                return result;
+            }
+
             return std::nullopt;
         }
 
-        const std::size_t expected = (version == IPVersion::IPv4) ? IPV4_BYTE_COUNT : IPV6_BYTE_COUNT;
-
-        if (bytes.size() != expected)
+        [[nodiscard]]
+        static IPAddress Loopback(IPVersion version) noexcept
         {
-            return std::nullopt;
+            IPAddress address;
+
+            if (version == IPVersion::IPv4)
+            {
+                address.m_version = IPVersion::IPv4;
+                address.m_bytes[0] = 127;
+                address.m_bytes[3] = 1;
+            }
+            else
+            {
+                address.m_version = IPVersion::IPv6;
+                address.m_bytes[15] = 1;
+            }
+
+            return address;
         }
 
-        IPAddress address;
-        address.m_version = version;
-        std::copy(bytes.begin(), bytes.end(), address.m_bytes.begin());
-        return address;
-    }
-
-    [[nodiscard]]
-    static std::optional<IPAddress> Parse(std::string_view address) noexcept
-    {
-        if (address.empty() || address.size() >= INET6_ADDRSTRLEN)
+        [[nodiscard]]
+        static IPAddress Any(IPVersion version) noexcept
         {
-            return std::nullopt;
+            IPAddress address;
+            address.m_version = (version == IPVersion::IPv4) ? IPVersion::IPv4 : IPVersion::IPv6;
+            return address;
         }
 
-        if (address.find('\0') != std::string_view::npos)
+        [[nodiscard]]
+        IPVersion GetVersion() const noexcept
         {
-            return std::nullopt;
+            return m_version;
         }
 
-        // Stack buffer avoids heap allocation
-        char buffer[INET6_ADDRSTRLEN]{ 0 };
-        std::memcpy(buffer, address.data(), address.size());
-        buffer[address.size()] = '\0';
-
-        IPAddress result;
-        in_addr ipv4{};
-
-        if (::inet_pton(AF_INET, buffer, &ipv4) == 1)
+        /// Raw pointer overload for C-style APIs (inet_ntop, sockaddr population).
+        [[nodiscard]]
+        const std::uint8_t* Bytes() const noexcept
         {
-            result.m_version = IPVersion::IPv4;
-            std::memcpy(result.m_bytes.data(), &ipv4, sizeof(ipv4));
-            return result;
+            return m_bytes.data();
         }
 
-        in6_addr ipv6{};
-
-        if (::inet_pton(AF_INET6, buffer, &ipv6) == 1)
+        /// Safe span accessor sized to the valid byte count (4 or 16).
+        [[nodiscard]]
+        std::span<const std::uint8_t> SpanBytes() const noexcept
         {
-            result.m_version = IPVersion::IPv6;
-            std::memcpy(result.m_bytes.data(), &ipv6, sizeof(ipv6));
-            return result;
+            return { m_bytes.data(), ByteCount() };
         }
 
-        return std::nullopt;
-    }
-
-    [[nodiscard]]
-    static IPAddress Loopback(IPVersion version) noexcept
-    {
-        IPAddress address;
-
-        if (version == IPVersion::IPv4)
+        [[nodiscard]]
+        std::size_t ByteCount() const noexcept
         {
-            address.m_version = IPVersion::IPv4;
-            address.m_bytes[0] = 127;
-            address.m_bytes[3] = 1;
-        }
-        else
-        {
-            address.m_version = IPVersion::IPv6;
-            address.m_bytes[15] = 1;
+            return (m_version == IPVersion::IPv4) ? IPV4_BYTE_COUNT : IPV6_BYTE_COUNT;
         }
 
-        return address;
-    }
-
-    [[nodiscard]]
-    static IPAddress Any(IPVersion version) noexcept
-    {
-        IPAddress address;
-        address.m_version = (version == IPVersion::IPv4) ? IPVersion::IPv4 : IPVersion::IPv6;
-        return address;
-    }
-
-    [[nodiscard]]
-    IPVersion GetVersion() const noexcept
-    {
-        return m_version;
-    }
-
-    /// Raw pointer overload for C-style APIs (inet_ntop, sockaddr population).
-    [[nodiscard]]
-    const std::uint8_t* Bytes() const noexcept
-    {
-        return m_bytes.data();
-    }
-
-    /// Safe span accessor sized to the valid byte count (4 or 16).
-    [[nodiscard]]
-    std::span<const std::uint8_t> SpanBytes() const noexcept
-    {
-        return { m_bytes.data(), ByteCount() };
-    }
-
-    [[nodiscard]]
-    std::size_t ByteCount() const noexcept
-    {
-        return (m_version == IPVersion::IPv4) ? IPV4_BYTE_COUNT : IPV6_BYTE_COUNT;
-    }
-
-    [[nodiscard]]
-    std::string ToString() const
-    {
-        char buffer[INET6_ADDRSTRLEN]{};
-        const int family = (m_version == IPVersion::IPv4) ? AF_INET : AF_INET6;
-
-        if (::inet_ntop(family, m_bytes.data(), buffer, sizeof(buffer)) == nullptr)
+        [[nodiscard]]
+        std::string ToString() const
         {
-            return std::string{};
+            char buffer[INET6_ADDRSTRLEN]{};
+            const int family = (m_version == IPVersion::IPv4) ? AF_INET : AF_INET6;
+
+            if (::inet_ntop(family, m_bytes.data(), buffer, sizeof(buffer)) == nullptr)
+            {
+                return std::string{};
+            }
+
+            return std::string{ buffer };
         }
 
-        return std::string{ buffer };
-    }
+        // --- Relational Operators ---
 
-    // --- Relational Operators ---
-
-    [[nodiscard]]
-    bool operator==(const IPAddress& other) const noexcept
-    {
-        if (m_version != other.m_version)
+        [[nodiscard]]
+        bool operator==(const IPAddress& other) const noexcept
         {
-            return false;
+            if (m_version != other.m_version)
+            {
+                return false;
+            }
+
+            return std::equal(m_bytes.begin(), m_bytes.begin() + ByteCount(), other.m_bytes.begin());
         }
 
-        return std::equal(m_bytes.begin(), m_bytes.begin() + ByteCount(), other.m_bytes.begin());
-    }
-
-    [[nodiscard]]
-    friend std::strong_ordering operator<=>(const IPAddress& lhs, const IPAddress& rhs) noexcept
-    {
-        if (auto cmp = lhs.m_version <=> rhs.m_version; cmp != 0)
+        [[nodiscard]]
+        friend std::strong_ordering operator<=>(const IPAddress& lhs, const IPAddress& rhs) noexcept
         {
-            return cmp;
+            if (auto cmp = lhs.m_version <=> rhs.m_version; cmp != 0)
+            {
+                return cmp;
+            }
+
+            return std::lexicographical_compare_three_way(
+                lhs.m_bytes.begin(), lhs.m_bytes.begin() + lhs.ByteCount(),
+                rhs.m_bytes.begin(), rhs.m_bytes.begin() + rhs.ByteCount());
         }
 
-        return std::lexicographical_compare_three_way(
-            lhs.m_bytes.begin(), lhs.m_bytes.begin() + lhs.ByteCount(),
-            rhs.m_bytes.begin(), rhs.m_bytes.begin() + rhs.ByteCount());
-    }
-
-    [[nodiscard]]
-    std::size_t Hash() const noexcept
-    {
-        constexpr std::size_t offset = (sizeof(std::size_t) == 8) ? 14695981039346656037ull : 2166136261u;
-        constexpr std::size_t prime = (sizeof(std::size_t) == 8) ? 1099511628211ull : 16777619u;
-
-        std::size_t hash = offset;
-        const std::size_t byteCount = ByteCount();
-
-        hash ^= static_cast<std::size_t>(m_version);
-        hash *= prime;
-
-        for (std::size_t i = 0; i < byteCount; ++i)
+        [[nodiscard]]
+        std::size_t Hash() const noexcept
         {
-            hash ^= m_bytes[i];
+            constexpr std::size_t offset = (sizeof(std::size_t) == 8) ? 14695981039346656037ull : 2166136261u;
+            constexpr std::size_t prime = (sizeof(std::size_t) == 8) ? 1099511628211ull : 16777619u;
+
+            std::size_t hash = offset;
+            const std::size_t byteCount = ByteCount();
+
+            hash ^= static_cast<std::size_t>(m_version);
             hash *= prime;
+
+            for (std::size_t i = 0; i < byteCount; ++i)
+            {
+                hash ^= m_bytes[i];
+                hash *= prime;
+            }
+
+            return hash;
         }
 
-        return hash;
-    }
+    public:
+        static constexpr std::size_t IPV4_BYTE_COUNT{ 4 };
+        static constexpr std::size_t IPV6_BYTE_COUNT{ 16 };
 
-public:
-    static constexpr std::size_t IPV4_BYTE_COUNT{ 4 };
-    static constexpr std::size_t IPV6_BYTE_COUNT{ 16 };
-
-private:
-    IPVersion m_version{ IPVersion::IPv4 };
-    std::array<std::uint8_t, IPV6_BYTE_COUNT> m_bytes{};
-};
+    private:
+        IPVersion m_version{ IPVersion::IPv4 };
+        std::array<std::uint8_t, IPV6_BYTE_COUNT> m_bytes{};
+    };
+}
 
 namespace std
 {
     template <>
-    struct hash<IPAddress>
+    struct hash<net::IPAddress>
     {
-        std::size_t operator()(const IPAddress& address) const noexcept
+        std::size_t operator()(const net::IPAddress& address) const noexcept
         {
             return address.Hash();
         }

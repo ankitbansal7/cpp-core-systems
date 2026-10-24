@@ -8,6 +8,8 @@
 #include <iostream>
 #include <utility>
 
+using namespace net;
+
 namespace
 {
     SocketResult<SocketHandle> MakeTcpSocket(int family = AF_INET) noexcept

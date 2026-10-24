@@ -6,6 +6,8 @@
 #include <type_traits>
 #include <utility>
 
+using namespace net;
+
 static_assert(!std::is_default_constructible_v<SocketResult<int>>);
 static_assert(std::is_copy_constructible_v<SocketResult<int>>);
 static_assert(std::is_copy_assignable_v<SocketResult<int>>);

@@ -6,6 +6,8 @@
 #include <string_view>
 #include <unordered_set>
 
+using namespace net;
+
 namespace
 {
 class ValidIPAddress : public testing::TestWithParam<const char*> {};

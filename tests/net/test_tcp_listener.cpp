@@ -6,6 +6,8 @@
 #include <type_traits>
 #include <utility>
 
+using namespace net;
+
 static_assert(!std::is_copy_constructible_v<TcpListener>);
 static_assert(!std::is_copy_assignable_v<TcpListener>);
 static_assert(std::is_nothrow_move_constructible_v<TcpListener>);

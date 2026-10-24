@@ -7,6 +7,8 @@
 #include <span>
 #include <string_view>
 
+using namespace net;
+
 namespace
 {
     bool SetReceiveTimeout(UdpSocket& socket)

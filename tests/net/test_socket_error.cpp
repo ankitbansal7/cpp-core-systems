@@ -5,6 +5,8 @@
 #include <system_error>
 #include <utility>
 
+using namespace net;
+
 TEST(SocketError, DefaultAndFactorySuccessHaveNoError)
 {
     const SocketError empty;

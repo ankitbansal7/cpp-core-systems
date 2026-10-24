@@ -7,6 +7,8 @@
 #include <string_view>
 #include <unordered_set>
 
+using namespace net;
+
 namespace
 {
 class ValidEndpoint : public testing::TestWithParam<const char*> {};
