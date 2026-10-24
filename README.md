@@ -2,6 +2,16 @@
 Low-level C++ runtime and systems foundations with performance-focused experiments.
 This repository is used as a personal reference and learning codebase.
 
+## Networking namespace
+
+The socket types under `include/net/` live in namespace `net`: `net::TcpSocket`,
+`net::TcpListener`, `net::UdpSocket`, `net::SocketEndpoint`, `net::IPAddress`,
+`net::SocketResult`, `net::SocketError`, `net::SocketHandle` and
+`net::SocketRuntime`. Internal helpers in `include/net/detail/` are in
+`net::detail` and are not part of the public API. The sections below use the
+short names; qualify them with `net::` or add `using namespace net;` in a source
+file.
+
 ## TCP networking
 
 `TcpSocket` is a move-only blocking TCP connection. Call `Connect(endpoint)` on
